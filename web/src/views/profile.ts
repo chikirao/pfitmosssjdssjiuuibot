@@ -39,9 +39,9 @@ function settingsCard(s: UserSettings) {
   const paused = state.me!.pausedUntil > Date.now() / 1000;
   return `<div class="card enter" style="--i:1">
     <div class="card-head">${icon("bolt")} Автозапись</div>
-    <div class="setting"><div class="grow">Автозаписей в неделю<div class="sub">«Записывать сам» и ловушки. 0 — выключено</div></div>
+    <div class="setting"><div class="grow">Автозаписей в неделю<div class="sub">«Записывать сам» и ловушки. 0 — выключено. У ИТМО максимум 2 в неделю</div></div>
       <div class="stepper"><button class="btn btn-tertiary" style="width:36px;padding:0" data-step="-1">−</button><b id="sLimit">${s.autoWeeklyLimit}</b><button class="btn btn-tertiary" style="width:36px;padding:0" data-step="1">+</button></div></div>
-    <div class="setting"><div class="grow">Тратить последнюю попытку<div class="sub">Если осталась одна запись — её только вручную</div></div>
+    <div class="setting"><div class="grow">Тратить последнюю запись семестра<div class="sub">Если осталась одна — её только вручную</div></div>
       <button class="switch" role="switch" data-set="autoUseLastAttempt" aria-checked="${s.autoUseLastAttempt}"></button></div>
     <div class="setting"><div class="grow">Записывать при пересечении с парами</div>
       <button class="switch" role="switch" data-set="autoAllowIntersection" aria-checked="${s.autoAllowIntersection}"></button></div>

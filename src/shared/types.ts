@@ -94,7 +94,7 @@ export interface UserSettings {
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
-  autoWeeklyLimit: 3,
+  autoWeeklyLimit: 2, // у ИТМО максимум 2 посещения в неделю
   autoUseLastAttempt: false,
   autoAllowIntersection: false,
   quietFrom: "23:00",

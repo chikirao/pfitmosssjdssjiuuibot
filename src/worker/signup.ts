@@ -33,8 +33,8 @@ async function autoGuard(env: Env, client: ItmoClient, tgId: number, l: LessonRe
   if (l.intersection && !s.autoAllowIntersection) return "Занятие пересекается с парами — автозапись на такие выключена";
 
   const attempts = await getAttempts(client);
-  if (attempts.free !== null && attempts.free <= 0) return "Не осталось попыток записи";
-  if (attempts.free === 1 && !s.autoUseLastAttempt) return "Осталась последняя попытка записи — её трачу только вручную";
+  if (attempts.free !== null && attempts.free <= 0) return "Записи в этом семестре закончились (лимит ИТМО)";
+  if (attempts.free === 1 && !s.autoUseLastAttempt) return "Осталась последняя запись в семестре — её трачу только вручную";
 
   const chosen = await getChosen(client);
   const clash = chosen.find((c) => c.date === l.date && overlaps(c, { start: l.start, end: l.end }));

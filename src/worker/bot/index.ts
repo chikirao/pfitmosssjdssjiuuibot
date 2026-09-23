@@ -175,7 +175,7 @@ export function createBot(env: Env, origin?: string) {
       const c = client(ctx);
       const [chosen, attempts] = await Promise.all([getChosen(c), getAttempts(c)]);
       const future = chosen.filter((l) => lessonStartUnix(l) > nowSec());
-      const att = attempts.free !== null ? `\nСвободных попыток записи: <b>${attempts.free}</b>${attempts.total !== null ? ` из ${attempts.total}` : ""}` : "";
+      const att = attempts.free !== null ? `\nОсталось записей в семестре: <b>${attempts.free}</b>${attempts.total !== null ? ` из ${attempts.total}` : ""} (и не больше 2 в неделю)` : "";
       if (!future.length) return ctx.reply(`Предстоящих записей нет.${att}`, { parse_mode: "HTML" });
       const kb = new InlineKeyboard();
       future.slice(0, 10).forEach((l) => kb.text(buttonLabel(l, "✖ "), `u:${l.id}`).row());
@@ -228,7 +228,7 @@ export function createBot(env: Env, origin?: string) {
   bot.command("settings", async (ctx) => {
     const s = parseSettings((await getUser(env.DB, ctx.from!.id))?.settings);
     await ctx.reply(
-      `<b>Настройки</b>\nАвтозаписей в неделю: <b>${s.autoWeeklyLimit}</b>\nТратить последнюю попытку: <b>${s.autoUseLastAttempt ? "да" : "нет"}</b>\nАвтозапись при пересечении с парами: <b>${s.autoAllowIntersection ? "да" : "нет"}</b>\nТихие часы: <b>${s.quietFrom && s.quietTo ? `${s.quietFrom}–${s.quietTo}` : "выкл"}</b>\n\nМенять — в мини-аппе, вкладка «Профиль».`,
+      `<b>Настройки</b>\nАвтозаписей в неделю: <b>${s.autoWeeklyLimit}</b>\nТратить последнюю запись семестра: <b>${s.autoUseLastAttempt ? "да" : "нет"}</b>\nАвтозапись при пересечении с парами: <b>${s.autoAllowIntersection ? "да" : "нет"}</b>\nТихие часы: <b>${s.quietFrom && s.quietTo ? `${s.quietFrom}–${s.quietTo}` : "выкл"}</b>\n\nМенять — в мини-аппе, вкладка «Профиль».`,
       { parse_mode: "HTML", reply_markup: openAppKb("#profile") },
     );
   });

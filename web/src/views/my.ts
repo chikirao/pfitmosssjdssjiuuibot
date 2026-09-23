@@ -45,7 +45,7 @@ function renderMy() {
     <div class="hero"><h1>Мои записи</h1><span class="meta">${future.length} ${plural(future.length, "предстоящая", "предстоящие", "предстоящих")}</span></div>
     ${
       a.free !== null
-        ? `<div class="card enter" style="margin-bottom:12px"><div class="card-head">${icon("ticket")} Попытки записи</div><div class="big">${a.free}<small>${a.total !== null ? `из ${a.total}` : ""} свободно</small></div></div>`
+        ? `<div class="card enter" style="margin-bottom:12px"><div class="card-head">${icon("ticket")} Записей в семестре</div><div class="big">${a.free}<small>${a.total !== null ? `из ${a.total}` : ""} осталось</small></div><div class="hint">Лимит ИТМО: ${a.total ?? "—"} занятий за семестр и не больше 2 в неделю</div></div>`
         : ""
     }
     <div class="list">
