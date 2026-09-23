@@ -288,6 +288,7 @@ h2.section-title { font-size: 20px; letter-spacing: -.02em; margin: 28px 4px 12p
 @media (max-width: 420px) { .sec-row { grid-template-columns: 64px 76px minmax(0, 1fr) auto; } }
 
 .enter { animation: rise .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.calm .enter, .calm .score-ring circle { animation: none; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
 .empty { text-align: center; padding: 44px 22px; max-width: 520px; margin: 12px auto 0; }

@@ -23,6 +23,7 @@ let tab: Tab = "schedule";
 function setTab(next: Tab, push = true) {
   tab = next;
   for (const t of TABS) $(`#view-${t}`).hidden = t !== next;
+  $(`#view-${next}`).classList.remove("calm"); // показ вкладки — с анимацией, последующие обновления — без
   const dock = $("#dock");
   $$("button", dock).forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === next)));
   moveInd(dock);

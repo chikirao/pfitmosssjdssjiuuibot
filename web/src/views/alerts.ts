@@ -46,6 +46,7 @@ export async function loadAlerts() {
 
 function renderAlerts() {
   const el = root();
+  el.classList.toggle("calm", !!el.querySelector(".hero")); // перерисовка после загрузки — без повторной анимации
   if (!state.watchers || !state.catches) {
     el.innerHTML = `<div class="skeleton"></div>`;
     if (state.me) loadAlerts();

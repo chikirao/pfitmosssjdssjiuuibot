@@ -15,7 +15,11 @@ export async function loadMy() {
   if (!hasToken() || loadingMy) return;
   loadingMy = true;
   try {
-    data = await api.my();
+    const next = await api.my();
+    // те же данные — не перерисовываем (иначе анимация появления проиграется второй раз)
+    const same = data !== null && JSON.stringify(next) === JSON.stringify(data);
+    data = next;
+    if (same) return;
     state.chosenIds = new Set(data.chosen.map((c) => c.id));
     emit("chosen");
   } catch (e) {
@@ -61,6 +65,8 @@ function scoreCard(s: MyResponse["score"] | undefined) {
 
 function renderMy() {
   const el = root();
+  // обновление уже показанного экрана — без повторной анимации появления
+  el.classList.toggle("calm", !!el.querySelector(".score, .hero"));
   if (!hasToken()) {
     el.innerHTML = `<div class="card empty"><h2>Нет токена ИТМО</h2><p>Подключи my.itmo.ru, чтобы видеть свои записи.</p><button class="soft" id="myConnect">${icon("key")} Подключить</button></div>`;
     $<HTMLButtonElement>("#myConnect", el).onclick = () => openTokenSheet(loadMy);
