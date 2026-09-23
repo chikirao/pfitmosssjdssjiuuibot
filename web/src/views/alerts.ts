@@ -72,25 +72,25 @@ function renderAlerts() {
       <button class="soft" id="addWatcher" style="justify-self:start">${icon("plus")} Новое правило</button>
     </div>
 
-    <h2 class="section-title">🎯 Поймать место</h2>
+    <h2 class="section-title">🎯 Конкретные занятия</h2>
     <div class="list">
       ${
         active.length
           ? active
               .map(
                 (c) => `<div class="card row-card"><div class="grow"><div class="title">${esc(c.section)}</div>
-                <div class="sub">${esc(fmtDay.format(asDate(c.date)))}, ${esc(c.start)} · проверяю раз в минуту</div></div>
+                <div class="sub">${esc(fmtDay.format(asDate(c.date)))}, ${esc(c.start)} · ${c.mode === "notify" ? "🔔 сообщу о месте" : "🎯 запишу сам"}</div></div>
                 <button class="btn btn-ghost" data-cancel="${c.id}" aria-label="Отменить">${icon("x")}</button></div>`,
               )
               .join("")
-          : `<div class="muted" style="padding:0 4px">Нет активных ловушек. Открой занятие без мест в «Расписании» и нажми «Поймать место».</div>`
+          : `<div class="muted" style="padding:0 4px">Пока ни за чем не слежу. Открой занятие без мест в «Расписании»: «Поймать место» — запишу сам, «Только сообщить» — напишу, когда место появится.</div>`
       }
       ${
         finished.length
           ? `<details style="margin-top:4px"><summary class="muted" style="cursor:pointer;padding:4px">История</summary><div class="list" style="margin-top:8px">${finished
               .map(
                 (c) =>
-                  `<div class="card row-card" style="opacity:.75"><div class="grow"><div class="title">${c.status === "done" ? "✅" : c.status === "failed" ? "❌" : "⌛"} ${esc(c.section)}</div><div class="sub">${esc(fmtDay.format(asDate(c.date)))}, ${esc(c.start)} — ${esc(c.result ?? c.status)}</div></div></div>`,
+                  `<div class="card row-card" style="opacity:.75"><div class="grow"><div class="title">${c.status === "done" ? "✅" : c.status === "failed" ? "❌" : "⌛"} ${c.mode === "notify" ? "🔔 " : ""}${esc(c.section)}</div><div class="sub">${esc(fmtDay.format(asDate(c.date)))}, ${esc(c.start)} — ${esc(c.result ?? c.status)}</div></div></div>`,
               )
               .join("")}</div></details>`
           : ""

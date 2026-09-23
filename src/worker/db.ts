@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type Catch, type Lesson, type LessonFilter, type UserSettings, type Watcher, type WatcherInput } from "../shared/types";
+import { DEFAULT_SETTINGS, type Catch, type CatchMode, type Lesson, type LessonFilter, type UserSettings, type Watcher, type WatcherInput } from "../shared/types";
 import { nowSec } from "./time";
 
 export interface UserRow {
@@ -196,12 +196,16 @@ interface CatchRow {
   expires_at: number;
   last_check_at: number | null;
   created_at: number;
+  mode: CatchMode;
+  last_open: number;
 }
 
-export type CatchWithOwner = Catch & { tgId: number; groupId: number | null };
+export type CatchWithOwner = Catch & { tgId: number; groupId: number | null; lastOpen: boolean };
 
 const toCatch = (r: CatchRow): CatchWithOwner => ({
   id: r.id,
+  mode: r.mode === "notify" ? "notify" : "sign",
+  lastOpen: !!r.last_open,
   tgId: r.tg_id,
   groupId: r.lesson_group,
   lessonId: r.lesson_id,
@@ -240,21 +244,34 @@ export async function countActiveCatches(db: D1Database, tgId: number) {
   return r?.n ?? 0;
 }
 
-export async function insertCatch(db: D1Database, tgId: number, l: Lesson, expiresAt: number) {
+export async function insertCatch(db: D1Database, tgId: number, l: Lesson, expiresAt: number, mode: CatchMode = "sign") {
   const dup = await db.prepare("SELECT id FROM catches WHERE tg_id = ? AND lesson_id = ? AND date = ? AND status = 'active'").bind(tgId, l.id, l.date).first<{ id: number }>();
-  if (dup) return dup.id;
+  if (dup) {
+    // то же занятие ещё раз — просто меняем режим (например, «сообщить» → «записать»)
+    await db.prepare("UPDATE catches SET mode = ?, last_open = 0 WHERE id = ?").bind(mode, dup.id).run();
+    return dup.id;
+  }
   const r = await db
     .prepare(
-      `INSERT INTO catches (tg_id, lesson_id, lesson_group, building_id, date, start, finish, section, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO catches (tg_id, lesson_id, lesson_group, building_id, date, start, finish, section, expires_at, created_at, mode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
-    .bind(tgId, l.id, l.groupId, l.buildingId, l.date, l.start, l.end, l.section, expiresAt, nowSec())
+    .bind(tgId, l.id, l.groupId, l.buildingId, l.date, l.start, l.end, l.section, expiresAt, nowSec(), mode)
     .first<{ id: number }>();
   return r!.id;
 }
 
 export async function finishCatch(db: D1Database, id: number, status: Catch["status"], result: string | null) {
   await db.prepare("UPDATE catches SET status = ?, result = ?, last_check_at = ? WHERE id = ?").bind(status, result, nowSec(), id).run();
+}
+
+export async function getCatch(db: D1Database, tgId: number, id: number) {
+  const r = await db.prepare("SELECT * FROM catches WHERE tg_id = ? AND id = ?").bind(tgId, id).first<CatchRow>();
+  return r ? toCatch(r) : null;
+}
+
+export async function setCatchOpen(db: D1Database, id: number, open: boolean) {
+  await db.prepare("UPDATE catches SET last_open = ?, last_check_at = ? WHERE id = ?").bind(open ? 1 : 0, nowSec(), id).run();
 }
 
 export async function touchCatch(db: D1Database, id: number) {

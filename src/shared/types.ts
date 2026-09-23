@@ -67,8 +67,12 @@ export interface Watcher {
 
 export type WatcherInput = Omit<Watcher, "id" | "nextRunAt" | "lastRunAt">;
 
+/** sign — записать самому, notify — только сообщить, что место появилось. */
+export type CatchMode = "sign" | "notify";
+
 export interface Catch {
   id: number;
+  mode: CatchMode;
   lessonId: number;
   date: string;
   start: string;

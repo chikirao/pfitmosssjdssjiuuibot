@@ -4,6 +4,8 @@ import type { WatcherInput } from "../../shared/types";
 import {
   cancelCatch,
   deleteUser,
+  finishCatch,
+  getCatch,
   deleteWatcher,
   getUser,
   getWatcher,
@@ -39,7 +41,7 @@ const HELP = `<b>Физра ИТМО</b> — свободные места и з
 /my — мои записи (с отпиской)
 /watch <i>секция</i> — новое правило уведомлений
 /watches — мои правила
-/catches — «поймать место»: активные ловушки
+/catches — отслеживаемые занятия (🎯 запишу сам / 🔔 сообщу о месте)
 /token — добавить или сменить токен ИТМО
 /pause <i>часы</i> · /resume — тишина
 /settings — лимиты автозаписи и тихие часы
@@ -205,10 +207,10 @@ export function createBot(env: Env, origin?: string) {
 
   bot.command("catches", async (ctx) => {
     const cs = await listCatches(env.DB, ctx.from!.id, false);
-    if (!cs.length) return ctx.reply("Активных ловушек нет. Поставить можно в мини-аппе: кнопка 🎯 на занятии без мест.", { reply_markup: openAppKb() });
+    if (!cs.length) return ctx.reply("Ничего не отслеживаю. Открой занятие без мест в мини-аппе: «Поймать место» (запишу сам) или «Сообщить о месте».", { reply_markup: openAppKb() });
     const kb = new InlineKeyboard();
     cs.forEach((c) => kb.text(`✖ ${buttonLabel(c)}`, `cx:${c.id}`).row());
-    await ctx.reply(`<b>Ловлю места</b> (проверка раз в минуту):\n\n${cs.map((c, i) => `${i + 1}. <b>${esc(c.section)}</b> — ${humanDate(c.date)}, ${esc(c.start)}`).join("\n")}\n\nОтменить:`, {
+    await ctx.reply(`<b>Слежу за занятиями</b> (проверка раз в минуту):\n\n${cs.map((c) => `${c.mode === "notify" ? "🔔" : "🎯"} <b>${esc(c.section)}</b> — ${humanDate(c.date)}, ${esc(c.start)}`).join("\n")}\n\n🎯 — запишу сам, 🔔 — сообщу о месте. Отменить:`, {
       parse_mode: "HTML",
       reply_markup: kb,
     });
@@ -290,7 +292,30 @@ export function createBot(env: Env, origin?: string) {
 
   bot.callbackQuery(/^cx:(\d+)$/, async (ctx) => {
     await cancelCatch(env.DB, ctx.from.id, Number(ctx.match[1]));
-    await ctx.answerCallbackQuery({ text: "Ловушка снята" });
+    await ctx.answerCallbackQuery({ text: "Больше не слежу" });
+    await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+  });
+
+  // «Записать» из уведомления о месте (ловушка в режиме notify)
+  bot.callbackQuery(/^cs:(\d+)$/, async (ctx) => {
+    const c = await getCatch(env.DB, ctx.from.id, Number(ctx.match[1]));
+    if (!c || c.status !== "active") return ctx.answerCallbackQuery({ text: "Уже неактуально" });
+    await ctx.answerCallbackQuery({ text: "Записываю…" });
+    try {
+      const r = await signUp(env, client(ctx), ctx.from.id, { id: c.lessonId, date: c.date, start: c.start, end: c.end ?? undefined, section: c.section }, "offer");
+      if (r.ok || r.message.startsWith("Ты уже записан")) {
+        await finishCatch(env.DB, c.id, "done", "Записан");
+        await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+      }
+      await ctx.reply(
+        r.ok
+          ? `✅ Записан: <b>${esc(c.section)}</b>, ${humanDate(c.date)} ${esc(c.start)}`
+          : `❌ Не получилось: ${esc(r.message)}${r.noSeats ? "\nМесто уже заняли — продолжаю следить." : ""}`,
+        { parse_mode: "HTML", reply_markup: r.ok ? new InlineKeyboard().text("Отменить запись", `u:${c.lessonId}`) : undefined },
+      );
+    } catch (e) {
+      await ctx.reply(itmoErrorText(e), { parse_mode: "HTML" });
+    }
   });
 
   bot.callbackQuery(/^wd:(\d+)(:y)?$/, async (ctx) => {

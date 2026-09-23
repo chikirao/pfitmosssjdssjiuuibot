@@ -5,6 +5,7 @@ import { appUrl } from "./bot";
 import { esc, humanDate, lessonBlock, lessonLine, plural } from "./bot/format";
 import {
   activeCatches,
+  type CatchWithOwner,
   cleanup,
   dueWatchers,
   finishCatch,
@@ -14,10 +15,10 @@ import {
   markWatcherRun,
   parseSettings,
   replaceSeen,
+  setCatchOpen,
   touchCatch,
-  usersWithTokens,
-  type CatchWithOwner,
   type UserRow,
+  usersWithTokens,
   type WatcherWithOwner,
 } from "./db";
 import type { Env } from "./env";
@@ -98,10 +99,26 @@ async function runCatches(env: Env, budget: Budget, tg: Notifier) {
   for (const [tgId, catches] of byUser) {
     if (!budget.has(4)) return;
     const client = itmoFor(env, tgId, budget);
+    const user = await getUser(env.DB, tgId);
+    const silent = !!user && (user.paused_until > nowSec() || isQuiet(parseSettings(user.settings)));
     try {
       const limits = await getLimits(client);
       for (const c of catches) {
         const seats = seatsFor(limits, { id: c.lessonId, lesson_group_id: c.groupId ?? undefined });
+        if (c.mode === "notify") {
+          // только сообщаем — и только на переход «мест нет → есть»; в тишину ждём, пока она кончится
+          const open = seats.available > 0;
+          if (open && !c.lastOpen && !silent) {
+            await setCatchOpen(env.DB, c.id, true);
+            await tg.send(
+              tgId,
+              `🔔 Появилось место: <b>${esc(c.section)}</b> — ${humanDate(c.date)}, ${esc(c.start)}${c.end ? "–" + esc(c.end) : ""}\nСвободно ${seats.available} из ${seats.limit}`,
+              new InlineKeyboard().text("✅ Записать", `cs:${c.id}`).text("Хватит следить", `cx:${c.id}`),
+            );
+          } else if (!open && c.lastOpen) await setCatchOpen(env.DB, c.id, false);
+          else await touchCatch(env.DB, c.id);
+          continue;
+        }
         if (seats.available <= 0) {
           await touchCatch(env.DB, c.id);
           continue;

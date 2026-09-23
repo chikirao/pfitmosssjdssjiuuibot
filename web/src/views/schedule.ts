@@ -491,8 +491,14 @@ export function openLessonSheet(l: Lesson) {
     <div class="actions" style="flex-direction:column">
       ${mine ? `<button class="btn btn-danger block lg" id="aUnsign">${icon("x")}<span>Отписаться</span></button>` : ""}
       ${!mine && open ? `<button class="btn btn-ok block lg" id="aSign">${icon("check")}<span>Записаться</span></button>` : ""}
-      ${!mine && !open ? `<button class="btn btn-primary block lg" id="aCatch">${icon("target")}<span>Поймать место</span></button><p class="muted" style="margin:0;text-align:center">Проверяю раз в минуту и запишу, как только освободится</p>` : ""}
-      <button class="btn btn-tertiary block" id="aWatch">${icon("bell")}<span>Уведомлять о «${esc(l.section.length > 24 ? l.section.slice(0, 23) + "…" : l.section)}»</span></button>
+      ${
+        !mine && !open
+          ? `<button class="btn btn-primary block lg" id="aCatch">${icon("target")}<span>Поймать место — запишу сам</span></button>
+        <button class="btn btn-tertiary block" id="aNotify">${icon("bell")}<span>Только сообщить, когда появится место</span></button>
+        <p class="muted" style="margin:0;text-align:center">Слежу именно за этим занятием — ${esc(fmtShort.format(asDate(l.date)))}, ${esc(l.start)}. Проверяю раз в минуту.</p>`
+          : ""
+      }
+      <button class="btn btn-tertiary block" id="aWatch">${icon("bell")}<span>Правило на все «${esc(l.section.length > 22 ? l.section.slice(0, 21) + "…" : l.section)}»</span></button>
     </div>`,
     (body) => {
       $<HTMLButtonElement>("#aSign", body)?.addEventListener("click", (e) =>
@@ -517,15 +523,17 @@ export function openLessonSheet(l: Lesson) {
           toast("Запись отменена");
         }),
       );
-      $<HTMLButtonElement>("#aCatch", body)?.addEventListener("click", (e) =>
-        withLoading(e.currentTarget as HTMLButtonElement, async () => {
-          await api.createCatch(l);
-          state.catches = null;
-          emit("alerts");
-          closeSheet();
-          toast("🎯 Ловлю место — напишу в чат");
-        }),
-      );
+      for (const [id, mode] of [["#aCatch", "sign"], ["#aNotify", "notify"]] as const) {
+        $<HTMLButtonElement>(id, body)?.addEventListener("click", (e) =>
+          withLoading(e.currentTarget as HTMLButtonElement, async () => {
+            await api.createCatch(l, mode);
+            state.catches = null;
+            emit("alerts");
+            closeSheet();
+            toast(mode === "sign" ? "🎯 Ловлю место — запишу и напишу в чат" : "🔔 Напишу, как только появится место");
+          }),
+        );
+      }
       $<HTMLButtonElement>("#aWatch", body).onclick = () =>
         openWatcherEditor(null, { name: l.section, filter: { sections: [l.section], weeks: 2, onlyCanSign: true } });
     },

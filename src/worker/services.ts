@@ -1,5 +1,5 @@
 // Общая логика для API мини-аппа и бота.
-import { LIMITS, type Lesson, type LessonFilter, type ScheduleResponse, type TokenStatus, type WatcherInput } from "../shared/types";
+import { LIMITS, type CatchMode, type Lesson, type LessonFilter, type ScheduleResponse, type TokenStatus, type WatcherInput } from "../shared/types";
 import { countActiveCatches, getUser, insertCatch, insertWatcher, listWatchers, updateWatcher, type UserRow } from "./db";
 import type { Env } from "./env";
 import type { ItmoClient } from "./itmo/client";
@@ -49,11 +49,11 @@ export async function editWatcher(env: Env, tgId: number, id: number, w: Watcher
   await updateWatcher(env.DB, tgId, id, w, nextRunAt(w, nowSec(), true));
 }
 
-export async function createCatch(env: Env, tgId: number, l: Lesson) {
+export async function createCatch(env: Env, tgId: number, l: Lesson, mode: CatchMode = "sign") {
   const start = lessonStartUnix(l);
   if (start <= nowSec() + 60) throw new ValidationError("Занятие уже начинается");
-  if ((await countActiveCatches(env.DB, tgId)) >= LIMITS.maxActiveCatches) throw new ValidationError(`Максимум ${LIMITS.maxActiveCatches} активных ловушек`);
-  return insertCatch(env.DB, tgId, l, start);
+  if ((await countActiveCatches(env.DB, tgId)) >= LIMITS.maxActiveCatches) throw new ValidationError(`Максимум ${LIMITS.maxActiveCatches} отслеживаемых занятий`);
+  return insertCatch(env.DB, tgId, l, start, mode);
 }
 
 export async function hasToken(env: Env, tgId: number) {

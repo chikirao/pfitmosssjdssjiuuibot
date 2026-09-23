@@ -210,8 +210,8 @@ api.delete("/watchers/:id", async (c) => {
 api.get("/catches", async (c) => c.json(await listCatches(c.env.DB, uid(c))));
 
 api.post("/catches", async (c) => {
-  const { lesson } = await body<{ lesson: unknown }>(c);
-  const id = await createCatch(c.env, uid(c), sanitizeLesson(lesson));
+  const { lesson, mode } = await body<{ lesson: unknown; mode?: unknown }>(c);
+  const id = await createCatch(c.env, uid(c), sanitizeLesson(lesson), mode === "notify" ? "notify" : "sign");
   return c.json({ id });
 });
 

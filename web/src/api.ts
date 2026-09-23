@@ -1,4 +1,4 @@
-import type { Catch, Lesson, Me, MyResponse, ScheduleResponse, UserSettings, Watcher, WatcherInput } from "../../src/shared/types";
+import type { Catch, CatchMode, Lesson, Me, MyResponse, ScheduleResponse, UserSettings, Watcher, WatcherInput } from "../../src/shared/types";
 import { tg } from "./tg";
 
 export class ApiError extends Error {
@@ -55,6 +55,6 @@ export const api = {
   toggleWatcher: (id: number) => req<Watcher>("POST", `/watchers/${id}/toggle`),
   deleteWatcher: (id: number) => req<{ ok: true }>("DELETE", `/watchers/${id}`),
   catches: () => req<Catch[]>("GET", "/catches"),
-  createCatch: (lesson: Lesson) => req<{ id: number }>("POST", "/catches", { lesson }),
+  createCatch: (lesson: Lesson, mode: CatchMode = "sign") => req<{ id: number }>("POST", "/catches", { lesson, mode }),
   cancelCatch: (id: number) => req<{ ok: true }>("DELETE", `/catches/${id}`),
 };
