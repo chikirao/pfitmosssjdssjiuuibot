@@ -69,7 +69,9 @@ export function parseTokenInput(input: string, nowSec: number): TokenPair {
     } catch {
       throw new TokenInputError("Не получилось разобрать JSON — скопируй вывод скрипта целиком");
     }
-    candidates = [obj.access, obj.refresh, obj.access_token, obj.refresh_token].filter((x): x is string => typeof x === "string");
+    candidates = [obj.access, obj.refresh, obj.access_token, obj.refresh_token].filter((x): x is string => typeof x === "string" && !!x && x !== "false");
+    const rawRefresh = [obj.refresh, obj.refresh_token].find((x): x is string => typeof x === "string" && !!x && x !== "false");
+    if (rawRefresh && !decodeJwt(clean(rawRefresh))) throw new TokenInputError("Refresh-токен повреждён при копировании — запусти скрипт ещё раз и вставь вывод целиком");
   } else {
     candidates = text.split(/[\s|;,]+/).filter(Boolean);
   }
@@ -94,7 +96,8 @@ export function parseTokenInput(input: string, nowSec: number): TokenPair {
   }
   if (!access && !refresh) throw new TokenInputError("Не нашёл токен. Скопируй вывод скрипта с my.itmo.ru целиком");
   if (refreshInfo && refreshInfo.exp && refreshInfo.exp <= nowSec) throw new TokenInputError("Refresh-токен уже истёк — обнови страницу my.itmo.ru и запусти скрипт ещё раз");
-  if (!refresh && accessInfo && accessInfo.exp <= nowSec) throw new TokenInputError("Токен уже истёк — обнови страницу my.itmo.ru и скопируй заново");
+  if (!refresh && accessInfo && accessInfo.exp <= nowSec)
+    throw new TokenInputError("В присланном нет refresh-токена, а access уже истёк. Обнови my.itmo.ru, запусти скрипт из /token и пришли вывод целиком");
 
   return {
     access: access ?? "",

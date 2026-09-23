@@ -76,6 +76,11 @@ describe("token input", () => {
     expect(() => parseTokenInput(jwt({ iss: ISS, typ: "Bearer", exp: now - 1 }), now)).toThrow(TokenInputError);
     expect(() => parseTokenInput("hello", now)).toThrow(TokenInputError);
   });
+  it("empty/'false' refresh = no refresh; broken refresh = explicit error", () => {
+    expect(parseTokenInput(JSON.stringify({ access, refresh: "false" }), now).refresh).toBeNull();
+    expect(parseTokenInput(JSON.stringify({ access, refresh: "" }), now).refresh).toBeNull();
+    expect(() => parseTokenInput(JSON.stringify({ access, refresh: "eyJbroken" }), now)).toThrow(/повреждён/);
+  });
   it("offline refresh (exp=0) is fine", () => {
     const off = jwt({ iss: ISS, typ: "Offline", exp: 0 });
     expect(parseTokenInput(JSON.stringify({ access, refresh: off }), now).refreshExp).toBe(0);
@@ -83,12 +88,19 @@ describe("token input", () => {
 });
 
 describe("console token script", () => {
-  it("extracts both cookies", () => {
+  const run = (cookie: string, ls: Record<string, string>) => {
     let copied = "";
-    const document = { cookie: "foo=1; auth._token.itmoId=Bearer%20AAA; auth._refresh_token.itmoId=BBB; x=2" };
-    const fn = new Function("document", "copy", "console", "prompt", TOKEN_SCRIPT);
-    fn(document, (s: string) => (copied = s), { log() {} }, () => {});
-    expect(JSON.parse(copied)).toEqual({ access: "Bearer AAA", refresh: "BBB" });
+    const localStorage = { getItem: (k: string) => ls[k] ?? null };
+    const fn = new Function("document", "localStorage", "copy", "console", "prompt", TOKEN_SCRIPT);
+    fn({ cookie }, localStorage, (s: string) => (copied = s), { log() {} }, () => {});
+    return JSON.parse(copied);
+  };
+  it("reads cookies", () => {
+    expect(run("foo=1; auth._token.itmoId=Bearer%20AAA; auth._refresh_token.itmoId=BBB; x=2", {})).toEqual({ access: "Bearer AAA", refresh: "BBB" });
+  });
+  it("prefers localStorage, falls back to cookie, ignores 'false'", () => {
+    expect(run("auth._token.itmoId=Bearer%20AAA; auth._refresh_token.itmoId=false", { "auth._refresh_token.itmoId": "LSR" })).toEqual({ access: "Bearer AAA", refresh: "LSR" });
+    expect(run("auth._token.itmoId=Bearer%20AAA; auth._refresh_token.itmoId=false", { "auth._refresh_token.itmoId": "false" })).toEqual({ access: "Bearer AAA", refresh: "" });
   });
 });
 
