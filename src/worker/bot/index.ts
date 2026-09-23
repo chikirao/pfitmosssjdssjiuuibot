@@ -228,7 +228,7 @@ export function createBot(env: Env, origin?: string) {
   bot.command("settings", async (ctx) => {
     const s = parseSettings((await getUser(env.DB, ctx.from!.id))?.settings);
     await ctx.reply(
-      `<b>Настройки</b>\nАвтозаписей в неделю: <b>${s.autoWeeklyLimit}</b>\nТратить последнюю запись семестра: <b>${s.autoUseLastAttempt ? "да" : "нет"}</b>\nАвтозапись при пересечении с парами: <b>${s.autoAllowIntersection ? "да" : "нет"}</b>\nТихие часы: <b>${s.quietFrom && s.quietTo ? `${s.quietFrom}–${s.quietTo}` : "выкл"}</b>\n\nМенять — в мини-аппе, вкладка «Профиль».`,
+      `<b>Настройки</b>\nТратить последнюю запись семестра: <b>${s.autoUseLastAttempt ? "да" : "нет"}</b>\nАвтозапись при пересечении с парами: <b>${s.autoAllowIntersection ? "да" : "нет"}</b>\nТихие часы: <b>${s.quietFrom && s.quietTo ? `${s.quietFrom}–${s.quietTo}` : "выкл"}</b>\n\nМенять — в мини-аппе, вкладка «Профиль».`,
       { parse_mode: "HTML", reply_markup: openAppKb("#profile") },
     );
   });
@@ -328,7 +328,7 @@ export function createBot(env: Env, origin?: string) {
       } else if (op !== "r") {
         await editWatcher(env, ctx.from.id, id, next);
       }
-      await ctx.answerCallbackQuery({ text: op === "a" && v === "a" ? "⚡ Буду записывать сам — с учётом лимитов из /settings" : "Сохранено" });
+      await ctx.answerCallbackQuery({ text: op === "a" && v === "a" ? "⚡ Буду записывать сам — в рамках лимитов ИТМО (2 в неделю)" : "Сохранено" });
       await ctx.editMessageText(watcherText({ ...next, id }), { parse_mode: "HTML", reply_markup: watcherKeyboard({ ...next, id }) }).catch(() => {});
     } catch (e) {
       await ctx.answerCallbackQuery({ text: itmoErrorText(e).slice(0, 190), show_alert: true });

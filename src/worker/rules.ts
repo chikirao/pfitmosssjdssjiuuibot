@@ -106,7 +106,6 @@ export function sanitizeSettings(raw: unknown, current: UserSettings): UserSetti
   const s = (raw ?? {}) as Record<string, unknown>;
   const time = (v: unknown, fallback: string | null) => (v === null ? null : typeof v === "string" && HHMM.test(v) ? v : fallback);
   return {
-    autoWeeklyLimit: s.autoWeeklyLimit === undefined ? current.autoWeeklyLimit : Math.min(LIMITS.maxAutoWeekly, Math.max(0, Math.round(Number(s.autoWeeklyLimit) || 0))),
     autoUseLastAttempt: typeof s.autoUseLastAttempt === "boolean" ? s.autoUseLastAttempt : current.autoUseLastAttempt,
     autoAllowIntersection: typeof s.autoAllowIntersection === "boolean" ? s.autoAllowIntersection : current.autoAllowIntersection,
     quietFrom: s.quietFrom === undefined ? current.quietFrom : time(s.quietFrom, current.quietFrom),

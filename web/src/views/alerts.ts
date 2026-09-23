@@ -9,7 +9,7 @@ const root = () => $("#view-alerts");
 const ACTIONS: Record<WatcherAction, { title: string; hint: string; icon: string }> = {
   notify: { title: "Сообщать", hint: "Просто напишу, что появилось место", icon: "bell" },
   offer: { title: "Предлагать запись", hint: "Пришлю «Записать вас?» с кнопками Да / Нет", icon: "check" },
-  auto: { title: "Записывать сам", hint: "Запишу при первой возможности — с учётом лимитов из «Профиля»", icon: "bolt" },
+  auto: { title: "Записывать сам", hint: "Запишу при первой возможности — в рамках лимитов ИТМО", icon: "bolt" },
 };
 
 export function describe(w: WatcherInput) {

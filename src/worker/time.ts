@@ -54,7 +54,3 @@ export function inWindow(hhmm: string, from: string | null, to: string | null): 
   return from < to ? hhmm >= from && hhmm < to : hhmm >= from || hhmm < to;
 }
 
-/** Начало ISO-недели (пн 00:00 МСК) в unix-секундах — для недельного лимита автозаписей. */
-export function mskWeekStartUnix(ms = Date.now()): number {
-  return mskToUnix(mskMonday(ms), "00:00");
-}

@@ -305,14 +305,6 @@ export async function logSignup(
     .run();
 }
 
-export async function countAutoSignupsSince(db: D1Database, tgId: number, since: number) {
-  const r = await db
-    .prepare("SELECT COUNT(*) AS n FROM signups WHERE tg_id = ? AND ok = 1 AND action = 'sign' AND source IN ('auto', 'catch') AND created_at >= ?")
-    .bind(tgId, since)
-    .first<{ n: number }>();
-  return r?.n ?? 0;
-}
-
 export async function recentSignups(db: D1Database, tgId: number, limit = 20) {
   return (
     await db

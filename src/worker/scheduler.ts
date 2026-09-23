@@ -116,9 +116,13 @@ async function runCatches(env: Env, budget: Budget, tg: Notifier) {
           const done = r.message.startsWith("Ты уже записан");
           await finishCatch(env.DB, c.id, done ? "done" : "failed", r.message);
           await tg.send(tgId, `${done ? "✅" : "🎯 Место появилось, но не записал"}: <b>${esc(c.section)}</b> — ${when}\n${esc(r.message)}`, done ? undefined : tg.appKb());
-        } else {
-          // место могли занять раньше нас — продолжаем ловить
+        } else if (r.noSeats) {
+          // место успели занять раньше нас — продолжаем ловить
           await touchCatch(env.DB, c.id);
+        } else {
+          // ИТМО отказал по другой причине (лимиты, отбор, долги) — повторять бессмысленно
+          await finishCatch(env.DB, c.id, "failed", r.message);
+          await tg.send(tgId, `🎯 Место появилось, но ИТМО не дал записаться: <b>${esc(c.section)}</b> — ${when}\n${esc(r.message)}\n\nЛовушку снял.`, tg.appKb());
         }
       }
     } catch (e) {

@@ -82,9 +82,7 @@ export interface Catch {
 }
 
 export interface UserSettings {
-  /** Сколько автозаписей (auto + catch) в неделю разрешено. */
-  autoWeeklyLimit: number;
-  /** Можно ли тратить последнюю свободную попытку записи автоматически. */
+  /** Можно ли автоматически тратить последнюю запись семестра (лимит ИТМО). */
   autoUseLastAttempt: boolean;
   /** Автозапись на занятие, пересекающееся с парами. */
   autoAllowIntersection: boolean;
@@ -94,7 +92,6 @@ export interface UserSettings {
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
-  autoWeeklyLimit: 2, // у ИТМО максимум 2 посещения в неделю
   autoUseLastAttempt: false,
   autoAllowIntersection: false,
   quietFrom: "23:00",
@@ -147,5 +144,4 @@ export const LIMITS = {
   intervalChoices: [5, 10, 15, 30, 60, 120],
   minIntervalMin: 5,
   maxWeeks: 4,
-  maxAutoWeekly: 10,
 } as const;
