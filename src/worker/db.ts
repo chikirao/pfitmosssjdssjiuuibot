@@ -247,8 +247,8 @@ export async function countActiveCatches(db: D1Database, tgId: number) {
 export async function insertCatch(db: D1Database, tgId: number, l: Lesson, expiresAt: number, mode: CatchMode = "sign") {
   const dup = await db.prepare("SELECT id FROM catches WHERE tg_id = ? AND lesson_id = ? AND date = ? AND status = 'active'").bind(tgId, l.id, l.date).first<{ id: number }>();
   if (dup) {
-    // то же занятие ещё раз — просто меняем режим (например, «сообщить» → «записать»)
-    await db.prepare("UPDATE catches SET mode = ?, last_open = 0 WHERE id = ?").bind(mode, dup.id).run();
+    // то же занятие ещё раз — меняем режим и заодно обновляем время (раньше время бралось из слота сетки)
+    await db.prepare("UPDATE catches SET mode = ?, last_open = 0, start = ?, finish = ?, section = ? WHERE id = ?").bind(mode, l.start, l.end, l.section, dup.id).run();
     return dup.id;
   }
   const r = await db

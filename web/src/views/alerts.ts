@@ -80,7 +80,7 @@ function renderAlerts() {
               .map(
                 (c) => `<div class="card row-card"><div class="grow"><div class="title">${esc(c.section)}</div>
                 <div class="sub">${esc(fmtDay.format(asDate(c.date)))}, ${esc(c.start)} · ${c.mode === "notify" ? "🔔 сообщу о месте" : "🎯 запишу сам"}</div></div>
-                <button class="btn btn-ghost" data-cancel="${c.id}" aria-label="Отменить">${icon("x")}</button></div>`,
+                <button class="icon-btn" data-cancel="${c.id}" aria-label="Отменить">${icon("x")}</button></div>`,
               )
               .join("")
           : `<div class="muted" style="padding:0 4px">Пока ни за чем не слежу. Открой занятие без мест в «Расписании»: «Поймать место» — запишу сам, «Только сообщить» — напишу, когда место появится.</div>`
