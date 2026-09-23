@@ -85,6 +85,13 @@ const hhmm = (v?: string | null) => {
   return s.slice(0, 5);
 };
 
+/** Время из ISO-даты занятия (`date`/`date_end`). Это настоящее время: сайт показывает его в карточке,
+ *  а сетка расписания рисуется по слотам (вечером слоты по 2 ч, и 19:10–20:10 выглядит как 19:00–21:00). */
+const isoTime = (v?: string | null) => {
+  const t = v && v.includes("T") ? hhmm(v) : "";
+  return t && t !== "00:00" ? t : "";
+};
+
 export const lessonKey = (l: { id: number; date: string; start: string; groupId: number | null }) => `${l.date}|${l.id}|${l.start}|${l.groupId ?? ""}`;
 
 /** Свободные места: limits[group][lesson]; у «свободного посещения» — лучший из other_lessons. */
@@ -107,18 +114,20 @@ export function normalizeDays(days: RawDay[], buildingId: number, buildingName: 
     for (const l of day.lessons ?? []) {
       const slot = l.time_slot_id != null ? bySlot.get(l.time_slot_id) : undefined;
       const can = l.can_sign_in;
+      const slotStart = hhmm(l.time_start || slot?.time_start || l.date);
       const base = {
         id: Number(l.id),
         groupId: l.lesson_group_id ?? null,
         date: String(l.date || day.date || "").slice(0, 10),
-        start: hhmm(l.time_start || slot?.time_start || l.date),
       };
       out.push({
         ...base,
-        key: lessonKey(base),
+        start: isoTime(l.date) || slotStart,
+        // ключ — по слоту, как раньше: не сбивает состояние правил и ловушек
+        key: lessonKey({ ...base, start: slotStart }),
         buildingId,
         buildingName,
-        end: hhmm(l.time_end || slot?.time_end || l.date_end),
+        end: isoTime(l.date_end) || hhmm(l.time_end || slot?.time_end || l.date_end),
         section: (l.section_name || "Без названия").trim(),
         sportTypeId: l.sport_type_id ?? null,
         freeVisit: l.lesson_level === 1,
@@ -211,8 +220,8 @@ export function flattenChosen(raw: unknown): ChosenLesson[] {
         id: l.id,
         section: name || "Занятие",
         date: startIso.slice(0, 10),
-        start: hhmm(l.time_start || startIso),
-        end: hhmm(l.time_end || l.date_end),
+        start: isoTime(startIso) || hhmm(l.time_start || startIso),
+        end: isoTime(l.date_end) || hhmm(l.time_end || l.date_end),
         room: l.room_name || "",
         teacher: l.teacher_fio || "",
         groupId: gid,

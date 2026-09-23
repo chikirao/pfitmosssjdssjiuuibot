@@ -45,7 +45,9 @@ function lessonsFor(building: number, start: string) {
         room_name: ROOMS[building]![k % ROOMS[building]!.length],
         can_sign_in: { can_sign_in: (k + dayIdx) % 5 !== 0 },
         intersection: (k * 3 + dayIdx) % 7 === 0,
-        date: `${date}T${slot.time_start}:00+03:00`,
+        // как у ИТМО: вечерние слоты по 2 ч, а само занятие короче
+        date: `${date}T${slot.id >= 6 ? slot.time_start.slice(0, 3) + "10" : slot.time_start}:00+03:00`,
+        date_end: `${date}T${slot.id >= 6 ? String(+slot.time_start.slice(0, 2) + 1).padStart(2, "0") + ":10" : slot.time_end}:00+03:00`,
       });
     }
     out.push({ date, lessons });

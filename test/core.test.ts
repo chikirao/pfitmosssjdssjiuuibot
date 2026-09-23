@@ -135,11 +135,19 @@ describe("schedule normalize", () => {
       date: "2026-09-24T00:00:00+03:00",
       lessons: [
         { id: 1, section_name: "Плавание ", lesson_level: 2, lesson_group_id: 10, time_slot_id: 3, can_sign_in: { can_sign_in: true }, date: "2026-09-24T10:00:00+03:00" },
+        { id: 3, section_name: "Йога", lesson_group_id: 10, time_slot_id: 7, date: "2026-09-24T19:10:00+03:00", date_end: "2026-09-24T20:10:00+03:00" },
         { id: 2, section_name: "Свободное посещение", lesson_level: 1, lesson_group_id: 11, time_start: "12:00", time_end: "13:30", can_sign_in: { can_sign_in: false }, other_lessons: [{ id: 5 }, { id: 6 }] },
       ],
     },
   ];
-  const ls = normalizeDays(days, 273, "Кронва", limits, [{ id: 3, time_start: "10:00", time_end: "11:30" }]);
+  const ls = normalizeDays(days, 273, "Кронва", limits, [
+    { id: 3, time_start: "10:00", time_end: "11:30" },
+    { id: 7, time_start: "19:00", time_end: "21:00" },
+  ]).filter((l) => l.id !== 3);
+  const yoga = normalizeDays(days, 273, "Кронва", limits, [{ id: 7, time_start: "19:00", time_end: "21:00" }]).find((l) => l.id === 3)!;
+  it("real time from date/date_end, key by slot", () => {
+    expect(yoga).toMatchObject({ start: "19:10", end: "20:10", key: "2026-09-24|3|19:00|10" });
+  });
   it("maps fields, slots and limits", () => {
     expect(ls[0]).toMatchObject({ id: 1, section: "Плавание", date: "2026-09-24", start: "10:00", end: "11:30", available: 3, limit: 20, canSign: true, freeVisit: false });
     expect(ls[1]).toMatchObject({ available: 7, limit: 30, canSign: false, freeVisit: true, start: "12:00" });
