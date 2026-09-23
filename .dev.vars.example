@@ -1,0 +1,8 @@
+# Скопируй в .dev.vars (он в .gitignore). Сгенерировать ключи: npm run keys
+BOT_TOKEN=123456:ABC...
+WEBHOOK_SECRET=
+TOKEN_ENC_KEY=
+ALLOWED_USER_IDS=111111111,222222222
+ENVIRONMENT=development
+# Только для локальной разработки мини-аппа в обычном браузере (без Telegram):
+DEV_USER_ID=111111111

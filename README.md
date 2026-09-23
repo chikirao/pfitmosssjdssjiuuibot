@@ -1,0 +1,47 @@
+# Физра ИТМО — бот и мини-апп
+
+Приватный Telegram-бот с мини-аппом: показывает свободные места в секциях my.itmo.ru, присылает уведомления, записывает и отписывает.
+Работает целиком на одном Cloudflare Worker: мини-апп, API, webhook бота, cron и база D1.
+
+## Возможности
+
+- **Расписание**: все корпуса, 1–4 недели, график свободных мест по дням, фильтры, вид по дням или по секциям.
+- **Запись и отписка** в один тап из мини-аппа и кнопками в чате.
+- **Правила уведомлений**: по секциям, дням, времени, корпусам.
+  - Проверка *постоянно* (раз в 5–120 минут; пишет, когда место **появилось**) или *сводкой* в ЧЧ:ММ по выбранным дням.
+  - Действие: сообщить / предложить «Записать вас?» с кнопками Да и Нет / записать самому.
+- **🎯 Поймать место**: на занятие без мест; бот проверяет раз в минуту и записывает, как только оно освободится.
+- **Защиты автозаписи**: лимит в неделю, не тратить последнюю попытку, не записывать при пересечениях. Есть тихие часы и пауза.
+- **Токен ИТМО**: сохраняется зашифрованным и обновляется автоматически, пока жива сессия ITMO ID.
+
+Команды бота: `/free`, `/my`, `/watch <секция>`, `/watches`, `/catches`, `/token`, `/pause`, `/resume`, `/settings`, `/forget`, `/help`.
+
+## Разработка
+
+```bash
+npm install
+cp .dev.vars.example .dev.vars   # затем: npm run keys → вставить ключи; для мока MOCK_ITMO=1
+npm run db:migrate:local
+npm run dev                      # http://localhost:8787/?dev=1
+npm test && npm run typecheck
+```
+
+Подробности об архитектуре и правилах — в [CLAUDE.md](CLAUDE.md).
+
+## Деплой (Cloudflare)
+
+Прод: **https://fizra-bot.staszhereb5.workers.dev** — отдельный аккаунт Cloudflare (`account_id` закреплён в `wrangler.jsonc`),
+бот [@pfitmosssjdssjiuuibot](https://t.me/pfitmosssjdssjiuuibot).
+
+Доступ wrangler берёт из `.env` в корне (в git не попадает): `CLOUDFLARE_API_TOKEN` (шаблон «Edit Cloudflare Workers» + `D1:Edit`)
+и `CLOUDFLARE_ACCOUNT_ID`. Там же лежат копии прод-секретов `FIZRA_*`. Проверка перед любыми действиями: `npx wrangler whoami`.
+
+```bash
+npm run deploy                 # сборка мини-аппа + деплой воркера
+npm run db:migrate:remote      # после добавления новой миграции
+npx wrangler secret put NAME   # BOT_TOKEN, WEBHOOK_SECRET, TOKEN_ENC_KEY, ALLOWED_USER_IDS
+```
+
+- Добавить пользователя: он пишет боту `/start` и получает свой id → `npx wrangler secret put ALLOWED_USER_IDS` (id через запятую).
+- Webhook, команды и кнопку меню заново выставляет `https://fizra-bot.staszhereb5.workers.dev/tg/setup?key=<FIZRA_WEBHOOK_SECRET>`.
+- Сменить `TOKEN_ENC_KEY` = все сохранённые токены ИТМО станут нечитаемыми, пользователям придётся прислать их заново.

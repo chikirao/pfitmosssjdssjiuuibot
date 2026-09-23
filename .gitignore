@@ -1,0 +1,19 @@
+# secrets — никогда не коммитим
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# старый бот с живыми токенами в .env
+oldbot/
+
+node_modules/
+.wrangler/
+web/dist/
+dist/
+coverage/
+*.log
+__pycache__/
+*.pyc
+.claude/

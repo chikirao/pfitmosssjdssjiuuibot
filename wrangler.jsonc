@@ -1,0 +1,44 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fizra-bot",
+  // второй аккаунт Cloudflare (staszhereb5) — деплой с другим токеном упадёт, а не уйдёт не туда
+  "account_id": "3e8e9216c13b825ed1d53c8fa70ef4e2",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Мини-апп: собранный Vite (npm run build:web). /api/* и /tg/* всегда идут в воркер.
+  "assets": {
+    "directory": "./web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/tg/*", "/__scheduled"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fizra",
+      "database_id": "71ed729c-8e11-427f-bb0c-2e6b42363708",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Планировщик: токены, правила, «поймать место». Раз в минуту.
+  "triggers": { "crons": ["* * * * *"] },
+
+  "vars": {
+    "ENVIRONMENT": "production",
+    // Бюджет внешних fetch за один запуск cron (free: 50 subrequests).
+    "SUBREQUEST_BUDGET": "40",
+    "APP_URL": "https://fizra-bot.staszhereb5.workers.dev"
+  },
+
+  "observability": { "enabled": true }
+
+  // Секреты (wrangler secret put …, локально — .dev.vars):
+  //   BOT_TOKEN          — токен Telegram-бота
+  //   WEBHOOK_SECRET     — случайная строка, проверяется в X-Telegram-Bot-Api-Secret-Token
+  //   TOKEN_ENC_KEY      — 32 байта base64, ключ AES-GCM для токенов ИТМО
+  //   ALLOWED_USER_IDS   — telegram id через запятую (вайтлист)
+}
