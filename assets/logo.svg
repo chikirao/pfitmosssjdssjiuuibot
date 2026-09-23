@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#2d2238"/>
+      <stop offset=".6" stop-color="#17151b"/>
+      <stop offset="1" stop-color="#0e0e10"/>
+    </radialGradient>
+    <linearGradient id="arc" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7b4aa3"/>
+      <stop offset="1" stop-color="#e2c8f2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#a9c65a" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#a9c65a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <!-- дорожка: все места -->
+  <circle cx="512" cy="512" r="300" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="64"/>
+  <!-- занято / поймано: дуга 3/4, как кольцо мест в мини-аппе -->
+  <circle cx="512" cy="512" r="300" fill="none" stroke="url(#arc)" stroke-width="64" stroke-linecap="round"
+          pathLength="100" stroke-dasharray="72 100" transform="rotate(-90 512 512)"/>
+  <!-- точка «место появилось» на конце дуги -->
+  <g transform="rotate(259.2 512 512)">
+    <circle cx="512" cy="212" r="120" fill="url(#glow)"/>
+    <circle cx="512" cy="212" r="46" fill="#a9c65a"/>
+  </g>
+  <!-- галочка «записан» -->
+  <path d="M392 524 L476 606 L640 432" fill="none" stroke="#f4eefa" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
