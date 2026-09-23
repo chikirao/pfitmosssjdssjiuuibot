@@ -57,6 +57,8 @@ oldbot/              старый Python-бот на йогу (только ре
   - `GET /api/sport/sign/schedule?building_id=&date_start=&date_end=` — дни → lessons
   - `GET /api/sport/sign/schedule/limits` — `{[lesson_group_id]: {[lesson_id]: {available, limit}}}`
   - `GET /api/sport/time_slots`, `GET /api/sport/sign/chosen`, `GET /api/sport/personal/have_attempts`
+  - `GET /api/sport/semesters/current` → `{id, …}`; `GET /api/sport/personal/score?semester_id=` → `{sum: {attendances, other}, attendances: [...]}`.
+    Круг баллов на сайте — шкала до 100: сначала посещения, за ними доп. баллы (засчитываются при посещениях ≥ 60)
   - `POST /api/sport/sign/schedule/lessons` body `[lessonId]` — запись; `DELETE` с тем же body — отписка
 - **CORS закрыт**: из браузера на чужом домене ходить нельзя, только из воркера.
 - Мини-апп запрашивает `/api/schedule?from=&to=` (включительно, ≤ `LIMITS.maxRangeDays`, не дальше `maxAheadDays`; проверка — `parseRange`).

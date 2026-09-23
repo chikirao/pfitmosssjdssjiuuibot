@@ -26,6 +26,39 @@ export async function loadMy() {
   renderMy();
 }
 
+/** Круг как на my.itmo.ru: шкала до 100, сначала баллы за посещения, за ними — дополнительные. */
+function scoreCard(s: MyResponse["score"] | undefined) {
+  if (!s || s.attendance === null) return "";
+  const att = s.attendance;
+  const other = s.other ?? 0;
+  const total = Math.round(att + other);
+  const a = Math.min(100, att);
+  const o = Math.min(100 - a, other);
+  const active = att >= 60; // доп. баллы засчитываются только после 60 за посещения
+  const r = 52;
+  return `<h1 class="page-title">Баллы</h1>
+  <div class="card score enter">
+    <div class="score-ring ${active ? "" : "inactive"}">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="track" cx="60" cy="60" r="${r}" pathLength="100"/>
+        ${o > 0 ? `<circle class="other" cx="60" cy="60" r="${r}" pathLength="100" stroke-dasharray="${o} 100" stroke-dashoffset="${-a}"/>` : ""}
+        ${a > 0 ? `<circle class="att" cx="60" cy="60" r="${r}" pathLength="100" stroke-dasharray="${a} 100"/>` : ""}
+      </svg>
+      <div class="score-num"><b>${total}</b><i>из 100</i></div>
+    </div>
+    <div class="score-side">
+      ${s.semester ? `<div class="muted">${esc(s.semester)}</div>` : ""}
+      ${
+        total
+          ? `<div class="score-row"><span class="sw att"></span><b>${Math.round(att)}</b> за посещения <span class="muted">/ 60</span></div>
+        <div class="score-row"><span class="sw other"></span><b>${Math.round(other)}</b> дополнительных${active ? "" : ` <span class="muted">(неактивны)</span>`}</div>`
+          : `<div><b>Пока нет баллов</b></div><div class="muted">Появятся после посещений, соревнований или нормативов</div>`
+      }
+      <div class="hint">Зачёт — от 100 баллов, из них минимум 60 за посещения${att < 60 ? `: осталось ${Math.ceil(60 - att)}` : ""}</div>
+    </div>
+  </div>`;
+}
+
 function renderMy() {
   const el = root();
   if (!hasToken()) {
@@ -42,6 +75,7 @@ function renderMy() {
   const past = data.chosen.filter((c) => c.date < today).slice(-5).reverse();
   const a = data.attempts;
   el.innerHTML = `
+    ${scoreCard(data.score)}
     <div class="hero"><h1>Мои записи</h1><span class="meta">${future.length} ${plural(future.length, "предстоящая", "предстоящие", "предстоящих")}</span></div>
     ${
       a.free !== null

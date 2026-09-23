@@ -1,7 +1,7 @@
 // Расписание физры: эндпоинты найдены в JS-бандле my.itmo.ru (страница /sport/sign).
-import type { ChosenLesson, Lesson, Option } from "../../shared/types";
+import type { ChosenLesson, Lesson, Option, Score } from "../../shared/types";
 import { addDays, isoWeekday, mskMonday, mskToday } from "../time";
-import type { ItmoClient } from "./client";
+import { TokenExpiredError, type ItmoClient } from "./client";
 
 interface RawOption {
   id: number;
@@ -243,6 +243,26 @@ export async function getAttempts(client: ItmoClient): Promise<{ free: number | 
     return { free: r?.free_attempts ?? null, total: r?.total_attempts ?? null };
   } catch {
     return { free: null, total: null };
+  }
+}
+
+/** Баллы за семестр: /semesters/current → /personal/score (result.sum = {attendances, other}). */
+export async function getScore(client: ItmoClient): Promise<Score> {
+  try {
+    const sem = await client.get<{ id?: number; name?: string; title?: string; value?: string }>("/api/sport/semesters/current");
+    if (sem?.id == null) return { attendance: null, other: null, semester: null };
+    const r = await client.get<{ sum?: Record<string, number> | null }>(`/api/sport/personal/score?semester_id=${sem.id}`);
+    const sum = r?.sum ?? {};
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    return {
+      attendance: num(sum.attendances),
+      // всё, что не посещения, — «дополнительные» (на сайте это ключ other)
+      other: Object.entries(sum).reduce((a, [k, v]) => (k === "attendances" ? a : a + num(v)), 0),
+      semester: sem.name ?? sem.title ?? sem.value ?? null,
+    };
+  } catch (e) {
+    if (e instanceof TokenExpiredError) throw e;
+    return { attendance: null, other: null, semester: null };
   }
 }
 

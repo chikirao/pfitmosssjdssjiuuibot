@@ -18,7 +18,7 @@ import {
 } from "./db";
 import { type Env, isAllowed, isDev } from "./env";
 import { BudgetExceeded, ItmoError, TokenExpiredError } from "./itmo/client";
-import { getAttempts, getChosen } from "./itmo/schedule";
+import { getAttempts, getChosen, getScore } from "./itmo/schedule";
 import { clearTokens, itmoFor } from "./itmo/session";
 import { nextRunAt, parseRange, sanitizeSettings, sanitizeWatcher, ValidationError } from "./rules";
 import { acceptTokenInput, createCatch, createWatcher, editWatcher, loadSchedule, TokenInputError, tokenStatus } from "./services";
@@ -154,10 +154,11 @@ api.get("/schedule", async (c) => {
 
 api.get("/my", async (c) => {
   const client = itmoFor(c.env, uid(c));
-  const [chosen, attempts, signups] = await Promise.all([getChosen(client), getAttempts(client), recentSignups(c.env.DB, uid(c))]);
+  const [chosen, attempts, score, signups] = await Promise.all([getChosen(client), getAttempts(client), getScore(client), recentSignups(c.env.DB, uid(c))]);
   const res: MyResponse = {
     chosen,
     attempts,
+    score,
     signups: signups.map((s) => ({ lessonId: s.lesson_id, section: s.section, date: s.date, start: s.start, source: s.source, action: s.action, ok: !!s.ok, message: s.message, createdAt: s.created_at })),
   };
   return c.json(res);

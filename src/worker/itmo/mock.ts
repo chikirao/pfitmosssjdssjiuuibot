@@ -85,6 +85,8 @@ export async function mockRequest(method: string, path: string, body: unknown): 
   if (method === "GET" && p === "/api/sport/time_slots") return SLOTS;
   if (method === "GET" && p === "/api/sport/sign/schedule/limits") return limits();
   if (method === "GET" && p === "/api/sport/sign/schedule") return lessonsFor(Number(url.searchParams.get("building_id")), url.searchParams.get("date_start")!);
+  if (method === "GET" && p === "/api/sport/semesters/current") return { id: 42, name: "Осень 2026/2027" };
+  if (method === "GET" && p === "/api/sport/personal/score") return { sum: { attendances: 44, other: 12 }, attendances: [] };
   if (method === "GET" && p === "/api/sport/personal/have_attempts") return { free_attempts: attempts, total_attempts: 5 };
   if (method === "GET" && p === "/api/sport/sign/chosen") {
     return [...chosen.entries()].map(([id, c]) => ({

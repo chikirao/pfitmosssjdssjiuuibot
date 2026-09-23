@@ -136,9 +136,17 @@ export interface ChosenLesson {
   groupId: number | null;
 }
 
+/** Баллы по физре за текущий семестр (как круг «Баллы за посещения» на my.itmo.ru). */
+export interface Score {
+  attendance: number | null; // за посещения; для зачёта нужно ≥ 60
+  other: number | null; // дополнительные (соревнования, нормативы, проекты) — засчитываются, когда за посещения ≥ 60
+  semester: string | null;
+}
+
 export interface MyResponse {
   chosen: ChosenLesson[];
   attempts: { free: number | null; total: number | null };
+  score: Score;
   signups: { lessonId: number; section: string | null; date: string | null; start: string | null; source: string; action: string; ok: boolean; message: string | null; createdAt: number }[];
 }
 

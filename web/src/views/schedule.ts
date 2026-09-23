@@ -12,7 +12,6 @@ import {
   fluidHover,
   openPopover,
   popoverOpenOn,
-  countUp,
   debounce,
   esc,
   fmtDay,
@@ -27,7 +26,6 @@ import {
   TODAY,
   nowHHMM,
   withLoading,
-  ymd,
 } from "../ui";
 import { openWatcherEditor } from "./alerts";
 import { openTokenSheet } from "./token";
@@ -127,7 +125,7 @@ export function renderSchedule() {
   if (!state.schedule) {
     el.innerHTML = state.scheduleError
       ? `<div class="card empty"><h2>Не получилось загрузить</h2><p>${esc(state.scheduleError)}</p><button class="soft" id="retry">${icon("refresh")} Ещё раз</button></div>`
-      : `<div class="stats"><div class="skeleton chart-card" style="height:260px"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>`;
+      : `<div class="skeleton" style="height:44px;margin-top:4px"></div><div class="skeleton" style="margin-top:12px"></div><div class="skeleton" style="margin-top:12px"></div>`;
     $<HTMLButtonElement>("#retry", el)?.addEventListener("click", () => loadSchedule(true));
     return;
   }
@@ -141,17 +139,6 @@ function renderShell() {
   if (el.dataset.shell) return;
   el.dataset.shell = "1";
   el.innerHTML = `
-    <section class="stats">
-      <div class="card chart-card enter">
-        <div class="card-head">${icon("chart")} Свободные места по дням <span class="right" id="chartRange"></span></div>
-        <div class="chart-scroll" id="chartScroll"><div class="chart" id="chart"></div></div>
-        <div class="chart-summary" id="chartSummary"></div>
-      </div>
-      <div class="card enter" style="--i:1"><div class="card-head">${icon("seat")} Свободно</div><div class="big"><span id="sFree">0</span><small>занятий</small></div><div class="hint" id="sFreeHint"></div></div>
-      <div class="card enter" style="--i:2"><div class="card-head">${icon("layers")} Секции</div><div class="big"><span id="sSec">0</span><small id="sSecOf"></small></div><div class="hint">с местами</div></div>
-      <div class="card enter" style="--i:3"><div class="card-head">${icon("user")} Мест всего</div><div class="big"><span id="sSeats">0</span></div><div class="hint" id="sSeatsHint"></div></div>
-      <div class="card enter" style="--i:4"><div class="card-head">${icon("check")} Можно записаться</div><div class="big"><span id="sCan">0</span><small>занятий</small></div><div class="hint">прямо сейчас</div></div>
-    </section>
     <div class="toolbar">
       <label class="search">${icon("search")}<input id="q" type="search" placeholder="Секция, преподаватель, зал…" autocomplete="off" enterkeyhint="search"></label>
       <div class="tb-row">
@@ -259,72 +246,18 @@ function renderShell() {
   });
 }
 
+/** Шапка (сколько занятий с местами) и подписи фильтров. */
 function renderStats() {
   const s = state.schedule!;
   const inScope = s.lessons.filter((l) => inBuilding(l) && notPast(l));
   const free = inScope.filter((l) => l.available > 0);
-  const seats = free.reduce((a, l) => a + l.available, 0);
-  const secFree = new Set(free.map((l) => l.section));
-  const secAll = new Set(inScope.map((l) => l.section));
 
   $("#topTitle").textContent = free.length ? `${free.length} ${plural(free.length, "занятие", "занятия", "занятий")} со свободными местами` : "Свободных мест пока нет";
   $("#streakArc").setAttribute("stroke-dasharray", `${inScope.length ? Math.round((100 * free.length) / inScope.length) : 0} 100`);
 
-  countUp($("#sFree"), free.length);
-  $("#sFreeHint").textContent = `из ${inScope.length} в расписании`;
-  countUp($("#sSec"), secFree.size);
-  $("#sSecOf").textContent = `/ ${secAll.size}`;
-  countUp($("#sSeats"), seats);
-  $("#sSeatsHint").textContent = free.length ? `≈ ${Math.round(seats / free.length)} на занятие` : "—";
-  countUp($("#sCan"), free.filter((l) => l.canSign).length);
-
   if (f.building !== "all" && !s.buildings.some((b) => String(b.id) === f.building)) f.building = "all";
   $("#buildingLbl").textContent = f.building === "all" ? "Все корпуса" : (s.buildings.find((b) => String(b.id) === f.building)?.name ?? "Корпус");
   $("#rangeLbl").textContent = rangeLabel(f.range);
-  renderChart();
-}
-
-function renderChart() {
-  const s = state.schedule!;
-  const days: string[] = [];
-  for (const d = asDate(s.dateStart); ymd(d) <= s.dateEnd && days.length < 62; d.setDate(d.getDate() + 1)) days.push(ymd(d));
-  // один-два дня — график бессмысленен, остаются карточки-счётчики
-  $(".chart-card").hidden = days.length < 3;
-  if (days.length < 3) return;
-  const by: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
-  for (const l of s.lessons) if (inBuilding(l) && l.date in by) by[l.date]! += l.available;
-  const max = Math.max(1, ...Object.values(by));
-  const today = TODAY();
-  $("#chartRange").textContent = `${fmtShort.format(asDate(days[0]!))} – ${fmtShort.format(asDate(days[days.length - 1]!))}`;
-  const chart = $("#chart");
-  // больше двух недель на узком экране — скроллим по неделям, а не сжимаем в нечитаемое
-  chart.classList.toggle("wide", days.length > 14 || (days.length > 7 && innerWidth < 380));
-  chart.innerHTML = days
-    .map(
-      (d, i) => `<button class="bar-col ${d === today ? "today" : ""} ${by[d] ? "" : "zero"} ${d < today ? "past" : ""} ${i === 0 || asDate(d).getDay() === 1 ? "week-snap" : ""}" data-day="${d}" title="${esc(fmtDay.format(asDate(d)))}: ${by[d]} мест">
-        <span class="bar-val">${by[d] || ""}</span>
-        <span class="bar" style="height:${Math.max(3, (by[d]! / max) * 100)}%;animation-delay:${Math.min(i, 20) * 20}ms"></span>
-        <span class="bar-lbl">${fmtWd.format(asDate(d)).slice(0, 2)}</span>
-      </button>`,
-    )
-    .join("");
-  chart.onclick = (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>(".bar-col");
-    if (b) jumpToDay(b.dataset.day!);
-  };
-  // прокрутить к текущей неделе
-  const todayIdx = days.indexOf(today);
-  if (todayIdx >= 7) requestAnimationFrame(() => $<HTMLElement>(`.bar-col[data-day="${days[todayIdx - ((asDate(today).getDay() + 6) % 7)]}"]`)?.scrollIntoView({ block: "nearest", inline: "start" }));
-
-  const future = days.filter((d) => d >= today).sort((a, b) => by[b]! - by[a]!);
-  const best = future[0];
-  const topSec = Object.entries(
-    s.lessons.filter((l) => inBuilding(l) && l.available > 0 && l.date >= today).reduce<Record<string, number>>((a, l) => ((a[l.section] = (a[l.section] ?? 0) + l.available), a), {}),
-  ).sort((a, b) => b[1] - a[1])[0];
-  $("#chartSummary").innerHTML =
-    best && by[best]
-      ? `Больше всего мест — <u>${esc(fmtDay.format(asDate(best)))}</u> (${by[best]}).${topSec ? ` Самая свободная секция — <u>${esc(topSec[0])}</u>.` : ""}`
-      : "На ближайшие дни свободных мест нет — поставь 🎯 ловушку или правило.";
 }
 
 const CHEVRON = `<svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>`;
@@ -457,13 +390,6 @@ function renderList(keepScroll = false) {
     );
   }
   if (keepScroll) scrollTo({ top: y });
-}
-
-function jumpToDay(d: string) {
-  if (f.view !== "days") $<HTMLButtonElement>('#viewSeg [data-view="days"]').click();
-  const target = $(`#d-${d}`);
-  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-  else toast("В этот день по фильтрам ничего нет");
 }
 
 // ---------- карточка занятия ----------
