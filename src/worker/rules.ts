@@ -54,6 +54,22 @@ export function isQuiet(s: UserSettings, now = nowSec()): boolean {
 
 export class ValidationError extends Error {}
 
+const YMD = /^\d{4}-\d\d-\d\d$/;
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+
+/** Диапазон дат из мини-аппа. Без параметров — ближайшие две недели. Возвращает строку-ошибку, если он кривой. */
+export function parseRange(from: string | undefined, to: string | undefined, today = mskToday()): { from: string; to: string } | string {
+  if (!from && !to) return { from: today, to: addDays(today, 13) };
+  from ||= to;
+  to ||= from;
+  if (!YMD.test(from!) || !YMD.test(to!) || Number.isNaN(Date.parse(from!)) || Number.isNaN(Date.parse(to!))) return "Даты — в формате ГГГГ-ММ-ДД";
+  if (from! > to!) [from, to] = [to, from];
+  if (dayDiff(today, from!) < -7) return "Прошлое дальше недели назад не показываю";
+  if (dayDiff(today, to!) > LIMITS.maxAheadDays) return `Расписание дальше ${LIMITS.maxAheadDays} дней вперёд не смотрю`;
+  if (dayDiff(from!, to!) + 1 > LIMITS.maxRangeDays) return `Не больше ${LIMITS.maxRangeDays} дней за раз`;
+  return { from: from!, to: to! };
+}
+
 const uniqNums = (xs: unknown, min: number, max: number) =>
   Array.isArray(xs) ? [...new Set(xs.map(Number).filter((n) => Number.isInteger(n) && n >= min && n <= max))] : undefined;
 

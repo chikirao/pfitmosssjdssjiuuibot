@@ -22,7 +22,7 @@ import {
 } from "./db";
 import type { Env } from "./env";
 import { Budget, BudgetExceeded, ItmoError, TokenExpiredError } from "./itmo/client";
-import { fetchSchedule, getLimits, scheduleCost, seatsFor } from "./itmo/schedule";
+import { fetchSchedule, getLimits, rangeForWeeks, scheduleCost, seatsFor } from "./itmo/schedule";
 import { itmoFor, keepAlive } from "./itmo/session";
 import { isOpen, isQuiet, lessonStartUnix, matchesFilter, nextRunAt, nextScheduleRun } from "./rules";
 import { signUp } from "./signup";
@@ -150,7 +150,7 @@ async function runWatchers(env: Env, budget: Budget, tg: Notifier, now: number) 
 
     let lessons: Lesson[];
     try {
-      lessons = (await fetchSchedule(itmoFor(env, tgId, budget), env.DB, { buildings, weeks })).lessons;
+      lessons = (await fetchSchedule(itmoFor(env, tgId, budget), env.DB, { buildings, ...rangeForWeeks(weeks) })).lessons;
     } catch (e) {
       if (e instanceof TokenExpiredError) await alertTokenDead(env, tg, user);
       else if (e instanceof BudgetExceeded) throw e;

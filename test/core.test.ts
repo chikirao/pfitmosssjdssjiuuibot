@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { verifyInitData } from "../src/worker/auth/telegram";
 import { TOKEN_SCRIPT } from "../src/worker/bot/format";
 import { b64encode, decryptString, encryptString, hmacSha256, toHex } from "../src/worker/crypto";
-import { flattenChosen, normalizeDays, seatsFor } from "../src/worker/itmo/schedule";
+import { flattenChosen, normalizeDays, seatsFor, weekStarts } from "../src/worker/itmo/schedule";
 import { parseTokenInput, TokenInputError } from "../src/worker/itmo/tokens";
-import { isQuiet, matchesFilter, nextScheduleRun, sanitizeWatcher, ValidationError } from "../src/worker/rules";
+import { isQuiet, matchesFilter, nextScheduleRun, parseRange, sanitizeWatcher, ValidationError } from "../src/worker/rules";
 import { addDays, inWindow, isoWeekday, mskMonday, mskToUnix, mskToday } from "../src/worker/time";
 import { DEFAULT_SETTINGS, type Lesson } from "../src/shared/types";
 
@@ -175,5 +175,23 @@ describe("watcher validation", () => {
   it("auto only with interval", () => {
     expect(() => sanitizeWatcher({ mode: "schedule", schedule: { time: "08:00" }, action: "auto" })).toThrow(ValidationError);
     expect(() => sanitizeWatcher({ mode: "schedule", schedule: { time: "8am" } })).toThrow(ValidationError);
+  });
+});
+
+describe("date range", () => {
+  it("parses and validates", () => {
+    const t = "2026-09-24";
+    expect(parseRange(undefined, undefined, t)).toEqual({ from: t, to: "2026-10-07" });
+    expect(parseRange("2026-10-07", undefined, t)).toEqual({ from: "2026-10-07", to: "2026-10-07" });
+    expect(parseRange("2026-10-25", "2026-10-20", t)).toEqual({ from: "2026-10-20", to: "2026-10-25" });
+    expect(typeof parseRange("2026-09-01", "2026-09-30", t)).toBe("string");
+    expect(typeof parseRange("2026-10-01", "2026-12-01", t)).toBe("string");
+    expect(typeof parseRange("2027-06-01", "2027-06-02", t)).toBe("string");
+    expect(typeof parseRange("2026-9-1", "x", t)).toBe("string");
+  });
+  it("splits into ITMO weeks", () => {
+    expect(weekStarts("2026-10-07", "2026-10-07")).toEqual(["2026-10-05"]);
+    expect(weekStarts("2026-09-24", "2026-10-07")).toEqual(["2026-09-21", "2026-09-28", "2026-10-05"]);
+    expect(weekStarts("2026-10-05", "2026-10-11")).toEqual(["2026-10-05"]);
   });
 });

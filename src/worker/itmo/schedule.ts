@@ -1,6 +1,6 @@
 // Расписание физры: эндпоинты найдены в JS-бандле my.itmo.ru (страница /sport/sign).
 import type { ChosenLesson, Lesson, Option } from "../../shared/types";
-import { addDays, mskMonday } from "../time";
+import { addDays, isoWeekday, mskMonday, mskToday } from "../time";
 import type { ItmoClient } from "./client";
 
 interface RawOption {
@@ -137,21 +137,31 @@ export function normalizeDays(days: RawDay[], buildingId: number, buildingName: 
 
 export interface ScheduleQuery {
   buildings: number[];
-  weeks: number;
-  dateStart?: string; // понедельник; по умолчанию текущая неделя
+  from: string; // YYYY-MM-DD включительно
+  to: string; // YYYY-MM-DD включительно
 }
+
+const mondayOf = (d: string) => addDays(d, 1 - isoWeekday(d));
+
+/** Недели (пн), которые задевает диапазон: у ИТМО спрашиваем ровно такими кусками, как делает сайт. */
+export function weekStarts(from: string, to: string): string[] {
+  const out: string[] = [];
+  for (let ds = mondayOf(from); ds <= to; ds = addDays(ds, 7)) out.push(ds);
+  return out;
+}
+
+/** «N недель вперёд» для правил: с сегодня до конца N-й недели. */
+export const rangeForWeeks = (weeks: number, ms = Date.now()) => ({ from: mskToday(ms), to: addDays(mskMonday(ms), 7 * weeks - 1) });
 
 export async function fetchSchedule(client: ItmoClient, db: D1Database, q: ScheduleQuery) {
   const dict = await getDictionaries(client, db);
   const names = new Map(dict.buildings.map((b) => [b.id, b.name]));
   const buildings = q.buildings.length ? q.buildings : dict.buildings.map((b) => b.id);
-  const start = q.dateStart ?? mskMonday();
   const limits = await getLimits(client);
 
   const jobs: Promise<Lesson[]>[] = [];
   for (const b of buildings) {
-    for (let w = 0; w < q.weeks; w++) {
-      const ds = addDays(start, 7 * w);
+    for (const ds of weekStarts(q.from, q.to)) {
       const qs = new URLSearchParams({ building_id: String(b), date_start: ds, date_end: addDays(ds, 7) });
       jobs.push(client.get<RawDay[]>(`/api/sport/sign/schedule?${qs}`).then((days) => normalizeDays(days ?? [], b, names.get(b) ?? `Корпус ${b}`, limits, dict.slots)));
     }
@@ -159,9 +169,10 @@ export async function fetchSchedule(client: ItmoClient, db: D1Database, q: Sched
   const seen = new Set<string>();
   const lessons = (await Promise.all(jobs))
     .flat()
+    .filter((l) => l.date >= q.from && l.date <= q.to)
     .filter((l) => (seen.has(l.buildingId + l.key) ? false : (seen.add(l.buildingId + l.key), true)))
     .sort((a, b) => (a.date + a.start + a.section).localeCompare(b.date + b.start + b.section));
-  return { dict, dateStart: start, lessons };
+  return { dict, lessons };
 }
 
 /** Сколько внешних запросов съест fetchSchedule (без кэша справочников). */

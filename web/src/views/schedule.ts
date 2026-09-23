@@ -1,12 +1,17 @@
 import type { Lesson } from "../../../src/shared/types";
 import { api, ApiError } from "../api";
 import { emit, hasToken, on, state } from "../state";
+import { openCalendar, rangeLabel, resolveRange, type RangePick } from "../calendar";
 import { haptic } from "../tg";
 import {
   $,
   $$,
   asDate,
+  closePopover,
   closeSheet,
+  fluidHover,
+  openPopover,
+  popoverOpenOn,
   countUp,
   debounce,
   esc,
@@ -22,6 +27,7 @@ import {
   TODAY,
   nowHHMM,
   withLoading,
+  ymd,
 } from "../ui";
 import { openWatcherEditor } from "./alerts";
 import { openTokenSheet } from "./token";
@@ -29,7 +35,7 @@ import { openTokenSheet } from "./token";
 const f = {
   view: store.get<"days" | "sections">("view", "days"),
   building: store.get<string>("building", "all"),
-  weeks: store.get<number>("weeks", 2),
+  range: store.get<RangePick>("range", { preset: "2w" }),
   q: "",
   onlyFree: store.get("onlyFree", true),
   onlyCan: store.get("onlyCan", false),
@@ -67,15 +73,17 @@ function filtered(ignoreSections = false) {
 
 export async function loadSchedule(force = false) {
   if (!hasToken() || loading) return;
+  const r = resolveRange(f.range);
   const cached = store.get<typeof state.schedule>("schedule", null);
-  if (!force && !state.schedule && cached && cached.weeks === f.weeks) {
+  if (!force && !state.schedule && cached && cached.dateStart === r.from && cached.dateEnd === r.to) {
     state.schedule = cached; // мгновенно показываем прошлые данные, потом обновляем
     emit("schedule");
   }
   loading = true;
   $("#reload")?.classList.add("spinning");
+  $("#list")?.classList.add("stale");
   try {
-    state.schedule = await api.schedule(f.weeks);
+    state.schedule = await api.schedule(r.from, r.to);
     state.scheduleError = null;
     store.set("schedule", state.schedule);
   } catch (e) {
@@ -86,6 +94,7 @@ export async function loadSchedule(force = false) {
   } finally {
     loading = false;
     $("#reload")?.classList.remove("spinning");
+    $("#list")?.classList.remove("stale");
   }
   emit("schedule");
 }
@@ -145,11 +154,13 @@ function renderShell() {
     </section>
     <div class="toolbar">
       <label class="search">${icon("search")}<input id="q" type="search" placeholder="Секция, преподаватель, зал…" autocomplete="off" enterkeyhint="search"></label>
-      <select class="select" id="building" aria-label="Корпус"></select>
-      <select class="select" id="weeks" aria-label="Недель">${[1, 2, 3, 4].map((w) => `<option value="${w}" ${w === f.weeks ? "selected" : ""}>${w} ${plural(w, "неделя", "недели", "недель")}</option>`).join("")}</select>
+      <div class="tb-row">
+        <button class="ctl" id="range" aria-haspopup="dialog" aria-expanded="false">${icon("cal")}<span id="rangeLbl">${esc(rangeLabel(f.range))}</span>${CHEVRON}</button>
+        <button class="ctl" id="building" aria-haspopup="listbox" aria-expanded="false">${icon("pin")}<span id="buildingLbl">Все корпуса</span>${CHEVRON}</button>
+      </div>
       <div class="viewseg" id="viewSeg" role="tablist"><span class="ind"></span>
-        <button role="tab" data-view="days" aria-selected="${f.view === "days"}">${icon("cal")}Дни</button>
-        <button role="tab" data-view="sections" aria-selected="${f.view === "sections"}">${icon("layers")}Секции</button>
+        <button role="tab" data-view="days" aria-selected="${f.view === "days"}" aria-label="По дням">${icon("list")}<span class="lbl">Дни</span></button>
+        <button role="tab" data-view="sections" aria-selected="${f.view === "sections"}" aria-label="По секциям">${icon("layers")}<span class="lbl">Секции</span></button>
       </div>
     </div>
     <div class="pills" id="pills"></div>
@@ -165,17 +176,23 @@ function renderShell() {
       renderList();
     }, 150),
   );
-  $<HTMLSelectElement>("#building", el).onchange = (e) => {
-    f.building = (e.target as HTMLSelectElement).value;
-    store.set("building", f.building);
-    f.sections.clear();
-    renderStats();
-    renderList();
-  };
-  $<HTMLSelectElement>("#weeks", el).onchange = (e) => {
-    f.weeks = Number((e.target as HTMLSelectElement).value);
-    store.set("weeks", f.weeks);
-    loadSchedule(true);
+  $<HTMLButtonElement>("#building", el).onclick = (e) => openBuildingMenu(e.currentTarget as HTMLButtonElement);
+  $<HTMLButtonElement>("#range", el).onclick = (e) => {
+    const s = state.schedule;
+    const marks: Record<string, number> = {};
+    for (const l of s?.lessons ?? []) if (inBuilding(l) && l.available > 0) marks[l.date] = (marks[l.date] ?? 0) + 1;
+    openCalendar(
+      e.currentTarget as HTMLButtonElement,
+      f.range,
+      (p) => {
+        f.range = p;
+        store.set("range", p);
+        $("#rangeLbl").textContent = rangeLabel(p);
+        pageLimit = PAGE;
+        loadSchedule(true);
+      },
+      marks,
+    );
   };
   const seg = $("#viewSeg", el);
   $$<HTMLButtonElement>("button", seg).forEach(
@@ -261,21 +278,19 @@ function renderStats() {
   $("#sSeatsHint").textContent = free.length ? `≈ ${Math.round(seats / free.length)} на занятие` : "—";
   countUp($("#sCan"), free.filter((l) => l.canSign).length);
 
-  const bsel = $<HTMLSelectElement>("#building");
   if (f.building !== "all" && !s.buildings.some((b) => String(b.id) === f.building)) f.building = "all";
-  bsel.innerHTML = `<option value="all">Все корпуса</option>` + s.buildings.map((b) => `<option value="${b.id}" ${String(b.id) === f.building ? "selected" : ""}>${esc(b.name)}</option>`).join("");
+  $("#buildingLbl").textContent = f.building === "all" ? "Все корпуса" : (s.buildings.find((b) => String(b.id) === f.building)?.name ?? "Корпус");
+  $("#rangeLbl").textContent = rangeLabel(f.range);
   renderChart();
 }
 
 function renderChart() {
   const s = state.schedule!;
   const days: string[] = [];
-  const start = asDate(s.dateStart);
-  for (let i = 0; i < s.weeks * 7; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    days.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
-  }
+  for (const d = asDate(s.dateStart); ymd(d) <= s.dateEnd && days.length < 62; d.setDate(d.getDate() + 1)) days.push(ymd(d));
+  // один-два дня — график бессмысленен, остаются карточки-счётчики
+  $(".chart-card").hidden = days.length < 3;
+  if (days.length < 3) return;
   const by: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
   for (const l of s.lessons) if (inBuilding(l) && l.date in by) by[l.date]! += l.available;
   const max = Math.max(1, ...Object.values(by));
@@ -286,7 +301,7 @@ function renderChart() {
   chart.classList.toggle("wide", days.length > 14 || (days.length > 7 && innerWidth < 380));
   chart.innerHTML = days
     .map(
-      (d, i) => `<button class="bar-col ${d === today ? "today" : ""} ${by[d] ? "" : "zero"} ${d < today ? "past" : ""} ${i % 7 === 0 ? "week-snap" : ""}" data-day="${d}" title="${esc(fmtDay.format(asDate(d)))}: ${by[d]} мест">
+      (d, i) => `<button class="bar-col ${d === today ? "today" : ""} ${by[d] ? "" : "zero"} ${d < today ? "past" : ""} ${i === 0 || asDate(d).getDay() === 1 ? "week-snap" : ""}" data-day="${d}" title="${esc(fmtDay.format(asDate(d)))}: ${by[d]} мест">
         <span class="bar-val">${by[d] || ""}</span>
         <span class="bar" style="height:${Math.max(3, (by[d]! / max) * 100)}%;animation-delay:${Math.min(i, 20) * 20}ms"></span>
         <span class="bar-lbl">${fmtWd.format(asDate(d)).slice(0, 2)}</span>
@@ -299,7 +314,7 @@ function renderChart() {
   };
   // прокрутить к текущей неделе
   const todayIdx = days.indexOf(today);
-  if (todayIdx >= 7) requestAnimationFrame(() => $<HTMLElement>(`.bar-col[data-day="${days[todayIdx - (todayIdx % 7)]}"]`)?.scrollIntoView({ block: "nearest", inline: "start" }));
+  if (todayIdx >= 7) requestAnimationFrame(() => $<HTMLElement>(`.bar-col[data-day="${days[todayIdx - ((asDate(today).getDay() + 6) % 7)]}"]`)?.scrollIntoView({ block: "nearest", inline: "start" }));
 
   const future = days.filter((d) => d >= today).sort((a, b) => by[b]! - by[a]!);
   const best = future[0];
@@ -310,6 +325,40 @@ function renderChart() {
     best && by[best]
       ? `Больше всего мест — <u>${esc(fmtDay.format(asDate(best)))}</u> (${by[best]}).${topSec ? ` Самая свободная секция — <u>${esc(topSec[0])}</u>.` : ""}`
       : "На ближайшие дни свободных мест нет — поставь 🎯 ловушку или правило.";
+}
+
+const CHEVRON = `<svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>`;
+
+function openBuildingMenu(anchor: HTMLButtonElement) {
+  if (popoverOpenOn(anchor)) return closePopover();
+  const s = state.schedule;
+  if (!s) return;
+  haptic.press();
+  const opts = [{ id: "all", name: "Все корпуса" }, ...s.buildings.map((b) => ({ id: String(b.id), name: b.name }))];
+  openPopover(
+    anchor,
+    `<div class="menu" role="listbox" aria-label="Корпус">${opts
+      .map((o) => `<button class="menu-i" role="option" data-v="${esc(o.id)}" aria-selected="${o.id === f.building}"><span>${esc(o.name)}</span>${icon("check")}</button>`)
+      .join("")}</div>`,
+    (el) => {
+      const menu = $(".menu", el);
+      fluidHover(menu, ".menu-i");
+      menu.addEventListener("click", (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".menu-i");
+        if (!b) return;
+        $$(".menu-i", menu).forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+        haptic.tap();
+        f.building = b.dataset.v!;
+        store.set("building", f.building);
+        f.sections.clear();
+        pageLimit = PAGE;
+        setTimeout(() => closePopover(), 90); // дать увидеть галочку
+        renderStats();
+        renderList();
+      });
+    },
+    { className: "pop-menu" },
+  );
 }
 
 function renderChips() {

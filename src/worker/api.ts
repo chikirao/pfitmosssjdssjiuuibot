@@ -20,7 +20,7 @@ import { type Env, isAllowed, isDev } from "./env";
 import { BudgetExceeded, ItmoError, TokenExpiredError } from "./itmo/client";
 import { getAttempts, getChosen } from "./itmo/schedule";
 import { clearTokens, itmoFor } from "./itmo/session";
-import { nextRunAt, sanitizeSettings, sanitizeWatcher, ValidationError } from "./rules";
+import { nextRunAt, parseRange, sanitizeSettings, sanitizeWatcher, ValidationError } from "./rules";
 import { acceptTokenInput, createCatch, createWatcher, editWatcher, loadSchedule, TokenInputError, tokenStatus } from "./services";
 import { signUp, unsign } from "./signup";
 import { nowSec } from "./time";
@@ -145,14 +145,10 @@ api.delete("/me", async (c) => {
 // ---------- расписание и запись ----------
 
 api.get("/schedule", async (c) => {
-  const weeks = Number(c.req.query("weeks")) || 2;
   const buildings = (c.req.query("buildings") ?? "").split(",").map(Number).filter((n) => n > 0);
-  const dateStart = c.req.query("date_start");
-  const res = await loadSchedule(c.env, itmoFor(c.env, uid(c)), {
-    weeks,
-    buildings,
-    dateStart: dateStart && /^\d{4}-\d\d-\d\d$/.test(dateStart) ? dateStart : undefined,
-  });
+  const range = parseRange(c.req.query("from"), c.req.query("to"));
+  if (typeof range === "string") return c.json({ error: range }, 400);
+  const res = await loadSchedule(c.env, itmoFor(c.env, uid(c)), { buildings, ...range });
   return c.json(res);
 });
 

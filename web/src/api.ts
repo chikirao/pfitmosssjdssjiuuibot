@@ -45,7 +45,7 @@ export const api = {
   setToken: (text: string) => req<{ message: string; hasRefresh: boolean; token: Me["token"] }>("POST", "/token", { text }),
   deleteToken: () => req<{ ok: true }>("DELETE", "/token"),
   forget: () => req<{ ok: true }>("DELETE", "/me"),
-  schedule: (weeks: number) => req<ScheduleResponse>("GET", `/schedule?weeks=${weeks}`),
+  schedule: (from: string, to: string) => req<ScheduleResponse>("GET", `/schedule?from=${from}&to=${to}`),
   my: () => req<MyResponse>("GET", "/my"),
   sign: (lesson: Lesson) => req<{ ok: boolean; message: string; skipped?: boolean }>("POST", "/sign", { lesson }),
   unsign: (l: { id: number; section?: string; date?: string; start?: string }) => req<{ ok: boolean; message: string }>("POST", "/unsign", l),

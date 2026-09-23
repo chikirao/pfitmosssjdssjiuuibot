@@ -172,3 +172,134 @@ export async function copyText(text: string) {
     return ok;
   }
 }
+
+// ---------- popover ----------
+// Попап в духе Fluid Functionalism: растёт от якоря (origin со стороны якоря), въезжает на 4px,
+// вход — критически задемпфированная «пружина» ~160 мс, выход — короткий tween 120 мс.
+let pop: { el: HTMLElement; anchor: HTMLElement; onClose?: () => void } | null = null;
+const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function placePopover() {
+  if (!pop) return;
+  const { el, anchor } = pop;
+  const r = anchor.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth;
+  const vh = innerHeight;
+  const below = vh - r.bottom - 16;
+  const above = r.top - 16;
+  const h = el.scrollHeight;
+  const side = below >= h || below >= above ? "bottom" : "top";
+  const w = el.offsetWidth;
+  const left = Math.max(12, Math.min(r.left, vw - 12 - w));
+  el.dataset.side = side;
+  el.style.left = left + "px";
+  el.style.maxHeight = Math.max(180, side === "bottom" ? below : above) + "px";
+  el.style.top = side === "bottom" ? r.bottom + 8 + "px" : "";
+  el.style.bottom = side === "top" ? vh - r.top + 8 + "px" : "";
+  el.style.transformOrigin = `${Math.round(r.left + r.width / 2 - left)}px ${side === "bottom" ? "0" : "100%"}`;
+}
+
+function onOutside(e: Event) {
+  const t = e.target as Node;
+  if (pop && !pop.el.contains(t) && !pop.anchor.contains(t)) closePopover();
+}
+function onKey(e: KeyboardEvent) {
+  if (e.key === "Escape") closePopover();
+}
+const closeNow = () => closePopover(true);
+
+export const popoverOpenOn = (anchor: HTMLElement) => pop?.anchor === anchor;
+
+/** Открыть попап у якоря. `needHeight` — сколько места хочется: если его нет ни сверху, ни снизу, страница подкрутится. */
+export function openPopover(anchor: HTMLElement, html: string, onMount?: (el: HTMLElement) => void, opts: { className?: string; needHeight?: number; onClose?: () => void } = {}) {
+  closePopover(true);
+  const r0 = anchor.getBoundingClientRect();
+  if (opts.needHeight && innerHeight - r0.bottom - 16 < opts.needHeight && r0.top - 16 < opts.needHeight) scrollBy({ top: r0.top - 72, behavior: "instant" });
+
+  const el = document.createElement("div");
+  el.className = "popover " + (opts.className ?? "");
+  el.setAttribute("role", "dialog");
+  el.innerHTML = html;
+  document.body.append(el);
+  pop = { el, anchor, onClose: opts.onClose };
+  anchor.setAttribute("aria-expanded", "true");
+  onMount?.(el);
+  placePopover();
+  if (reduced()) el.classList.add("in");
+  else requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("in")));
+
+  setBack(() => closePopover());
+  setTimeout(() => document.addEventListener("pointerdown", onOutside, true));
+  document.addEventListener("keydown", onKey);
+  addEventListener("scroll", placePopover, { passive: true });
+  addEventListener("resize", placePopover);
+  addEventListener("hashchange", closeNow);
+  return el;
+}
+
+export function closePopover(instant = false) {
+  if (!pop) return;
+  const { el, anchor, onClose } = pop;
+  pop = null;
+  anchor.setAttribute("aria-expanded", "false");
+  document.removeEventListener("pointerdown", onOutside, true);
+  document.removeEventListener("keydown", onKey);
+  removeEventListener("scroll", placePopover);
+  removeEventListener("resize", placePopover);
+  removeEventListener("hashchange", closeNow);
+  setBack(null);
+  onClose?.();
+  if (instant || reduced()) return el.remove();
+  el.classList.remove("in");
+  el.classList.add("out");
+  setTimeout(() => el.remove(), 140);
+}
+
+/** Изменить размер попапа (контент поменялся) — пересчитать позицию. */
+export const repositionPopover = () => placePopover();
+
+/**
+ * Fluid hover: одна подсветка, которая скользит к ближайшему элементу под курсором (по сетке — в обе оси),
+ * вместо :hover на каждом. Новая «сессия» (курсор вошёл заново) появляется на месте, без проезда.
+ * Только для мыши — на тач-экранах незачем.
+ */
+export function fluidHover(box: HTMLElement, selector: string) {
+  if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  const hl = document.createElement("span");
+  hl.className = "fh";
+  hl.setAttribute("aria-hidden", "true");
+  box.prepend(hl);
+  let live = false;
+  box.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    let best: HTMLElement | null = null;
+    let bd = Infinity;
+    for (const it of box.querySelectorAll<HTMLElement>(selector)) {
+      const r = it.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        best = it;
+        break;
+      }
+      const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+      if (d < bd) (bd = d), (best = it);
+    }
+    if (!best) return hl.classList.remove("on");
+    const b = box.getBoundingClientRect();
+    const r = best.getBoundingClientRect();
+    if (!live) hl.style.transition = "opacity 80ms";
+    hl.style.transform = `translate(${r.left - b.left - box.clientLeft + box.scrollLeft}px, ${r.top - b.top - box.clientTop + box.scrollTop}px)`;
+    hl.style.width = r.width + "px";
+    hl.style.height = r.height + "px";
+    hl.style.borderRadius = getComputedStyle(best).borderRadius;
+    hl.classList.add("on");
+    if (!live) {
+      live = true;
+      requestAnimationFrame(() => (hl.style.transition = ""));
+    }
+  });
+  box.addEventListener("pointerleave", () => {
+    live = false;
+    hl.classList.remove("on");
+  });
+  return hl;
+}

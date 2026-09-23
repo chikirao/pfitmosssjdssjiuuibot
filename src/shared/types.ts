@@ -115,8 +115,8 @@ export interface Me {
 
 export interface ScheduleResponse {
   fetchedAt: string;
-  dateStart: string;
-  weeks: number;
+  dateStart: string; // запрошенный диапазон, включительно
+  dateEnd: string;
   buildings: Option[];
   lessons: Lesson[];
 }
@@ -144,4 +144,6 @@ export const LIMITS = {
   intervalChoices: [5, 10, 15, 30, 60, 120],
   minIntervalMin: 5,
   maxWeeks: 4,
+  maxRangeDays: 42, // диапазон дат в календаре мини-аппа
+  maxAheadDays: 120,
 } as const;

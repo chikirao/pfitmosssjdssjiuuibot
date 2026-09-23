@@ -3,7 +3,7 @@ import { LIMITS, type Lesson, type LessonFilter, type ScheduleResponse, type Tok
 import { countActiveCatches, getUser, insertCatch, insertWatcher, listWatchers, updateWatcher, type UserRow } from "./db";
 import type { Env } from "./env";
 import type { ItmoClient } from "./itmo/client";
-import { fetchSchedule } from "./itmo/schedule";
+import { fetchSchedule, rangeForWeeks } from "./itmo/schedule";
 import { replaceTokens } from "./itmo/session";
 import { parseTokenInput, TokenInputError } from "./itmo/tokens";
 import { lessonStartUnix, matchesFilter, nextRunAt, ValidationError } from "./rules";
@@ -28,15 +28,14 @@ export async function acceptTokenInput(env: Env, tgId: number, text: string) {
 
 export { TokenInputError, ValidationError };
 
-export async function loadSchedule(env: Env, client: ItmoClient, q: { buildings?: number[]; weeks?: number; dateStart?: string }): Promise<ScheduleResponse> {
-  const weeks = Math.min(LIMITS.maxWeeks, Math.max(1, q.weeks ?? 2));
-  const { dict, dateStart, lessons } = await fetchSchedule(client, env.DB, { buildings: q.buildings ?? [], weeks, dateStart: q.dateStart });
-  return { fetchedAt: new Date().toISOString(), dateStart, weeks, buildings: dict.buildings, lessons };
+export async function loadSchedule(env: Env, client: ItmoClient, q: { buildings?: number[]; from: string; to: string }): Promise<ScheduleResponse> {
+  const { dict, lessons } = await fetchSchedule(client, env.DB, { buildings: q.buildings ?? [], from: q.from, to: q.to });
+  return { fetchedAt: new Date().toISOString(), dateStart: q.from, dateEnd: q.to, buildings: dict.buildings, lessons };
 }
 
 /** Открытые занятия по фильтру (для /free и дайджестов). */
 export async function findLessons(env: Env, client: ItmoClient, f: LessonFilter) {
-  const res = await loadSchedule(env, client, { buildings: f.buildings, weeks: f.weeks ?? 2 });
+  const res = await loadSchedule(env, client, { buildings: f.buildings, ...rangeForWeeks(Math.min(LIMITS.maxWeeks, f.weeks ?? 2)) });
   return res.lessons.filter((l) => matchesFilter(l, f));
 }
 

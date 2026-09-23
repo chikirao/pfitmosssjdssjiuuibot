@@ -43,7 +43,8 @@ src/worker/
   bot/               grammY: команды, inline-кнопки, форматирование сообщений
 web/                 мини-апп: Vite + TypeScript без фреймворка
   src/main.ts        табы (hash-роутинг #schedule/#my/#alerts/#profile), загрузка
-  src/views/*.ts     экраны; src/ui.ts хелперы/шит/тосты; src/tg.ts обёртка Telegram.WebApp
+  src/views/*.ts     экраны; src/ui.ts хелперы/шит/попап/fluidHover/тосты; src/tg.ts обёртка Telegram.WebApp
+  src/calendar.ts    всплывающий календарь диапазона дат (пресеты + выбор «начало → конец»)
   public/_headers    CSP и прочие заголовки безопасности
 migrations/          SQL для D1 (новые изменения — новым файлом 000N_*.sql, старые не править)
 oldbot/              старый Python-бот на йогу (только референс, в .gitignore: там живые токены)
@@ -58,6 +59,8 @@ oldbot/              старый Python-бот на йогу (только ре
   - `GET /api/sport/time_slots`, `GET /api/sport/sign/chosen`, `GET /api/sport/personal/have_attempts`
   - `POST /api/sport/sign/schedule/lessons` body `[lessonId]` — запись; `DELETE` с тем же body — отписка
 - **CORS закрыт**: из браузера на чужом домене ходить нельзя, только из воркера.
+- Мини-апп запрашивает `/api/schedule?from=&to=` (включительно, ≤ `LIMITS.maxRangeDays`, не дальше `maxAheadDays`; проверка — `parseRange`).
+  У ИТМО спрашиваем кусками пн+7 дней (`weekStarts`), как сам сайт, и обрезаем по диапазону. Правила по-прежнему смотрят «N недель вперёд» (`rangeForWeeks`).
 - `lesson.id` бывает общим у серии занятий, поэтому ключ занятия — `date|id|start|group` (`lessonKey`).
 - «Свободное посещение» (`lesson_level === 1`): места берутся по `other_lessons`.
 - Всё время — **МСК (UTC+3)**. Воркер работает в UTC; для дат только хелперы из `time.ts` (web: `ui.ts` `mskNow/TODAY`).
@@ -94,6 +97,8 @@ oldbot/              старый Python-бот на йогу (только ре
 - Фронт: DOM-строки через шаблоны + `esc()`; никаких inline-обработчиков (их режет CSP); клики — делегированием.
 - Дизайн: мягкие карточки (градиентная обводка, `--shadow-card`), кнопки `.btn-*` с эффектом нажатия из Fluid Functionalism
   (внутренний слой `inset:1px` + схлопывающийся spread 180 мс `cubic-bezier(.23,1,.32,1)`), `.soft` — «Reject»-кнопка из макета.
+  Попапы (`openPopover`) — как popup из Fluid Functionalism: растут от якоря, сдвиг 4px, вход 160 мс `--ease`, выход 120 мс; тень `--shadow-pop` (лестница shadow-6).
+  Списки/сетки в попапах — `fluidHover` (одна скользящая подсветка). Диапазон в календаре — сливающаяся полоса (merge/split).
   Цвета только через CSS-переменные; тёмная тема — `:root[data-theme=dark]` (ставится из Telegram `colorScheme`).
 - Производительность на телефоне: никаких `backdrop-filter`/`mask-image` на мобильных, списки порциями по 40, анимация только у первых ~12 карточек,
   `content-visibility:auto` на днях, поиск с debounce.

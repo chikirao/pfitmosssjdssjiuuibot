@@ -59,7 +59,7 @@ function updateSub() {
   const sub = $("#topSub");
   if (!me) return;
   if (me.token.status !== "ok") sub.textContent = me.token.status === "expired" ? "Токен ИТМО истёк" : "Токен ИТМО не подключён";
-  else if (state.schedule) sub.textContent = `Обновлено ${ago(state.schedule.fetchedAt)} · ${state.schedule.weeks} нед.`;
+  else if (state.schedule) sub.textContent = `Обновлено ${ago(state.schedule.fetchedAt)}`;
   else sub.textContent = "Загружаю расписание…";
 }
 setInterval(updateSub, 30000);
