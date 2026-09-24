@@ -1,4 +1,4 @@
-import { LIMITS, type Lesson, type LessonFilter, type UserSettings, type WatcherInput, type WatcherSchedule } from "../shared/types";
+import { LIMITS, THEORY_STEPS, type Lesson, type LessonFilter, type UserSettings, type WatcherInput, type WatcherSchedule } from "../shared/types";
 import { addDays, isoWeekday, mskHHMM, mskToUnix, mskToday, nowSec } from "./time";
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -126,6 +126,8 @@ export function sanitizeSettings(raw: unknown, current: UserSettings): UserSetti
     autoAllowIntersection: typeof s.autoAllowIntersection === "boolean" ? s.autoAllowIntersection : current.autoAllowIntersection,
     quietFrom: s.quietFrom === undefined ? current.quietFrom : time(s.quietFrom, current.quietFrom),
     quietTo: s.quietTo === undefined ? current.quietTo : time(s.quietTo, current.quietTo),
+    exempt: typeof s.exempt === "boolean" ? s.exempt : current.exempt,
+    theory: Array.isArray(s.theory) ? THEORY_STEPS.map((t) => t.id).filter((id) => (s.theory as unknown[]).includes(id)) : current.theory,
   };
 }
 

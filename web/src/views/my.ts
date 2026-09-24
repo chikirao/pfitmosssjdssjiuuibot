@@ -1,7 +1,7 @@
-import type { MyResponse } from "../../../src/shared/types";
+import { THEORY_STEPS, type MyResponse, type TheoryStep } from "../../../src/shared/types";
 import { api } from "../api";
 import { emit, hasToken, on, state } from "../state";
-import { confirmDialog } from "../tg";
+import { confirmDialog, haptic } from "../tg";
 import { $, $$, ago, asDate, esc, fmtDay, icon, plural, TODAY, toast, withLoading } from "../ui";
 import { openTokenSheet } from "./token";
 
@@ -31,14 +31,14 @@ export async function loadMy() {
 }
 
 /** Круг как на my.itmo.ru: шкала до 100, сначала баллы за посещения, за ними — дополнительные. */
-function scoreCard(s: MyResponse["score"] | undefined) {
+function scoreCard(s: MyResponse["score"] | undefined, exempt: boolean) {
   if (!s || s.attendance === null) return "";
   const att = s.attendance;
   const other = s.other ?? 0;
   const total = Math.round(att + other);
   const a = Math.min(100, att);
   const o = Math.min(100 - a, other);
-  const active = att >= 60; // доп. баллы засчитываются только после 60 за посещения
+  const active = exempt || att >= 60; // доп. баллы засчитываются только после 60 за посещения
   const r = 52;
   return `<h1 class="page-title">Баллы</h1>
   <div class="card score enter">
@@ -54,12 +54,36 @@ function scoreCard(s: MyResponse["score"] | undefined) {
       ${s.semester ? `<div class="muted">${esc(s.semester)}</div>` : ""}
       ${
         total
-          ? `<div class="score-row"><span class="sw att"></span><b>${Math.round(att)}</b> за посещения <span class="muted">/ 60</span></div>
+          ? `<div class="score-row"><span class="sw att"></span><b>${Math.round(att)}</b> за посещения${exempt ? "" : ` <span class="muted">/ 60</span>`}</div>
         <div class="score-row"><span class="sw other"></span><b>${Math.round(other)}</b> дополнительных${active ? "" : ` <span class="muted">(неактивны)</span>`}</div>`
-          : `<div><b>Пока нет баллов</b></div><div class="muted">Появятся после посещений, соревнований или нормативов</div>`
+          : `<div><b>Пока нет баллов</b></div><div class="muted">${exempt ? "Появятся, когда преподаватель проверит работу" : "Появятся после посещений, соревнований или нормативов"}</div>`
       }
-      <div class="hint">Зачёт — от 100 баллов, из них минимум 60 за посещения${att < 60 ? `: осталось ${Math.ceil(60 - att)}` : ""}</div>
+      <div class="hint">${
+        exempt
+          ? "Теоретический зачёт: баллы ставит преподаватель. Когда появятся — напишу в чат"
+          : `Зачёт — от 100 баллов, из них минимум 60 за посещения${att < 60 ? `: осталось ${Math.ceil(60 - att)}` : ""}`
+      }</div>
     </div>
+  </div>`;
+}
+
+/** Чек-лист теоретического зачёта (освобождение). Последний шаг отмечается сам, когда появились баллы. */
+function theoryCard(done: TheoryStep[], graded: boolean) {
+  const steps = [
+    ...THEORY_STEPS.map((s) => ({ ...s, on: done.includes(s.id), auto: false })),
+    { id: "graded", title: "Баллы проставлены", sub: "отмечу сам и напишу в чат", on: graded, auto: true },
+  ];
+  const next = steps.findIndex((s) => !s.on);
+  return `<div class="hero"><h1>Теор. зачёт</h1><span class="meta">${steps.filter((s) => s.on).length} из ${steps.length}</span></div>
+  <div class="card theory enter" style="--i:1">
+    ${steps
+      .map(
+        (s, i) => `<button class="step${s.on ? " on" : ""}${i === next ? " next" : ""}" ${s.auto ? "disabled" : `data-step="${s.id}"`} aria-pressed="${s.on}">
+        <span class="step-dot">${s.on ? icon("check") : i + 1}</span>
+        <span class="grow"><span class="step-title">${esc(s.title)}</span><span class="sub">${esc(s.sub)}</span></span></button>`,
+      )
+      .join("")}
+    <div class="hint">Каждый семестр заново. Когда ИТМО переключит семестр — сброшу отметки и напомню.</div>
   </div>`;
 }
 
@@ -76,12 +100,33 @@ function renderMy() {
     el.innerHTML = `<div class="skeleton"></div>`;
     return;
   }
+  const s = state.me!.settings;
+  if (s.exempt) {
+    el.innerHTML = `${scoreCard(data.score, true)}${theoryCard(s.theory, (data.score.other ?? 0) + (data.score.attendance ?? 0) > 0)}`;
+    $$<HTMLButtonElement>("[data-step]", el).forEach(
+      (b) =>
+        (b.onclick = async () => {
+          const id = b.dataset.step as TheoryStep;
+          const theory = s.theory.includes(id) ? s.theory.filter((x) => x !== id) : [...s.theory, id];
+          haptic.tap();
+          b.classList.toggle("on");
+          try {
+            state.me!.settings = await api.settings({ theory });
+          } catch (e) {
+            toast((e as Error).message, true);
+          }
+          el.classList.add("calm");
+          renderMy();
+        }),
+    );
+    return;
+  }
   const today = TODAY();
   const future = data.chosen.filter((c) => c.date >= today);
   const past = data.chosen.filter((c) => c.date < today).slice(-5).reverse();
   const a = data.attempts;
   el.innerHTML = `
-    ${scoreCard(data.score)}
+    ${scoreCard(data.score, false)}
     <div class="hero"><h1>Мои записи</h1><span class="meta">${future.length} ${plural(future.length, "предстоящая", "предстоящие", "предстоящих")}</span></div>
     ${
       a.free !== null

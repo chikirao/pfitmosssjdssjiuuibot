@@ -250,7 +250,7 @@ export async function getAttempts(client: ItmoClient): Promise<{ free: number | 
 export async function getScore(client: ItmoClient): Promise<Score> {
   try {
     const sem = await client.get<{ id?: number; name?: string; title?: string; value?: string }>("/api/sport/semesters/current");
-    if (sem?.id == null) return { attendance: null, other: null, semester: null };
+    if (sem?.id == null) return { attendance: null, other: null, semester: null, semesterId: null };
     const r = await client.get<{ sum?: Record<string, number> | null }>(`/api/sport/personal/score?semester_id=${sem.id}`);
     const sum = r?.sum ?? {};
     const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -259,10 +259,11 @@ export async function getScore(client: ItmoClient): Promise<Score> {
       // всё, что не посещения, — «дополнительные» (на сайте это ключ other)
       other: Object.entries(sum).reduce((a, [k, v]) => (k === "attendances" ? a : a + num(v)), 0),
       semester: sem.name ?? sem.title ?? sem.value ?? null,
+      semesterId: Number(sem.id),
     };
   } catch (e) {
     if (e instanceof TokenExpiredError) throw e;
-    return { attendance: null, other: null, semester: null };
+    return { attendance: null, other: null, semester: null, semesterId: null };
   }
 }
 

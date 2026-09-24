@@ -35,16 +35,24 @@ function tokenCard() {
   </div>`;
 }
 
+function exemptCard(s: UserSettings) {
+  return `<div class="card enter" style="--i:1;margin-bottom:12px">
+    <div class="card-head">${icon("shield")} Освобождение</div>
+    <div class="setting"><div class="grow">Сдаю теоретический зачёт<div class="sub">Спрячу расписание и уведомления, в «Моих» — баллы и чек-лист зачёта. Правила и ловушки встанут на паузу</div></div>
+      <button class="switch" role="switch" data-set="exempt" aria-checked="${s.exempt}"></button></div>
+  </div>`;
+}
+
 function settingsCard(s: UserSettings) {
   const paused = state.me!.pausedUntil > Date.now() / 1000;
-  return `<div class="card enter" style="--i:1">
+  return `${exemptCard(s)}${s.exempt ? "" : `<div class="card enter" style="--i:1">
     <div class="card-head">${icon("bolt")} Автозапись</div>
     <p class="muted" style="margin:6px 0 4px">«Записывать сам» и ловушки соблюдают лимиты ИТМО: не больше 2 занятий в неделю и лимит записей на семестр. Если упрусь в лимит — напишу почему.</p>
     <div class="setting"><div class="grow">Тратить последнюю запись семестра<div class="sub">Если осталась одна — её только вручную</div></div>
       <button class="switch" role="switch" data-set="autoUseLastAttempt" aria-checked="${s.autoUseLastAttempt}"></button></div>
     <div class="setting"><div class="grow">Записывать при пересечении с парами</div>
       <button class="switch" role="switch" data-set="autoAllowIntersection" aria-checked="${s.autoAllowIntersection}"></button></div>
-  </div>
+  </div>`}
   <div class="card enter" style="--i:2;margin-top:12px">
     <div class="card-head">${icon("moon")} Тишина</div>
     <div class="setting"><div class="grow">Тихие часы<div class="sub">Уведомления о новых местах придут после. Автозапись работает</div></div>
@@ -93,10 +101,11 @@ function renderProfile() {
     } catch (e) {
       toast((e as Error).message, true);
     }
-    renderProfile();
+    if ("exempt" in patch) emit("me"); // меняются вкладки
+    else renderProfile();
   };
   $$<HTMLButtonElement>("[data-set]", el).forEach((b) => {
-    const k = b.dataset.set as "autoUseLastAttempt" | "autoAllowIntersection";
+    const k = b.dataset.set as "autoUseLastAttempt" | "autoAllowIntersection" | "exempt";
     b.onclick = () => save({ [k]: !me.settings[k] });
   });
   $<HTMLButtonElement>("#quietSw", el).onclick = () => save(me.settings.quietFrom && me.settings.quietTo ? { quietFrom: null, quietTo: null } : { quietFrom: "23:00", quietTo: "08:00" });

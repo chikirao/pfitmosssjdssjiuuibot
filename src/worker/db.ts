@@ -14,6 +14,8 @@ export interface UserRow {
   refresh_lock_until: number;
   settings: string;
   paused_until: number;
+  score_last: string | null;
+  score_next_at: number;
   created_at: number;
   updated_at: number;
 }
@@ -65,6 +67,15 @@ export async function deleteUser(db: D1Database, id: number) {
 
 export async function usersWithTokens(db: D1Database) {
   return (await db.prepare("SELECT * FROM users WHERE token_status = 'ok' AND refresh_enc IS NOT NULL").all<UserRow>()).results;
+}
+
+/** У кого пора сверить баллы. */
+export async function dueScoreUsers(db: D1Database, now: number) {
+  return (await db.prepare("SELECT * FROM users WHERE token_status = 'ok' AND score_next_at <= ? ORDER BY score_next_at LIMIT 10").bind(now).all<UserRow>()).results;
+}
+
+export async function saveScoreCheck(db: D1Database, id: number, last: string | null, nextAt: number) {
+  await db.prepare("UPDATE users SET score_last = COALESCE(?, score_last), score_next_at = ? WHERE tg_id = ?").bind(last, nextAt, id).run();
 }
 
 // ---------- watchers ----------

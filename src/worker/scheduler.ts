@@ -1,4 +1,4 @@
-// Cron раз в минуту: обновление токенов, «поймать место», правила уведомлений.
+// Cron раз в минуту: обновление токенов, «поймать место», правила уведомлений, раз в 12 ч — баллы.
 import { Api, InlineKeyboard } from "grammy";
 import type { Lesson } from "../shared/types";
 import { appUrl } from "./bot";
@@ -7,6 +7,7 @@ import {
   activeCatches,
   type CatchWithOwner,
   cleanup,
+  dueScoreUsers,
   dueWatchers,
   finishCatch,
   getSeen,
@@ -15,6 +16,8 @@ import {
   markWatcherRun,
   parseSettings,
   replaceSeen,
+  saveScoreCheck,
+  saveSettings,
   setCatchOpen,
   touchCatch,
   type UserRow,
@@ -23,7 +26,7 @@ import {
 } from "./db";
 import type { Env } from "./env";
 import { Budget, BudgetExceeded, ItmoError, TokenExpiredError } from "./itmo/client";
-import { fetchSchedule, getLimits, rangeForWeeks, scheduleCost, seatsFor } from "./itmo/schedule";
+import { fetchSchedule, getLimits, getScore, rangeForWeeks, scheduleCost, seatsFor } from "./itmo/schedule";
 import { itmoFor, keepAlive } from "./itmo/session";
 import { isOpen, isQuiet, lessonStartUnix, matchesFilter, nextRunAt, nextScheduleRun } from "./rules";
 import { signUp } from "./signup";
@@ -64,6 +67,7 @@ export async function runScheduled(env: Env) {
     await refreshTokens(env, budget, tg);
     await runCatches(env, budget, tg);
     await runWatchers(env, budget, tg, now);
+    await runScores(env, budget, tg, now);
   } catch (e) {
     if (!(e instanceof BudgetExceeded)) throw e;
     console.warn("scheduler: budget exhausted, остальное — в следующую минуту");
@@ -100,6 +104,7 @@ async function runCatches(env: Env, budget: Budget, tg: Notifier) {
     if (!budget.has(4)) return;
     const client = itmoFor(env, tgId, budget);
     const user = await getUser(env.DB, tgId);
+    if (user && parseSettings(user.settings).exempt) continue; // освобождение — ловушки спят
     const silent = !!user && (user.paused_until > nowSec() || isQuiet(parseSettings(user.settings)));
     try {
       const limits = await getLimits(client);
@@ -150,6 +155,86 @@ async function runCatches(env: Env, budget: Budget, tg: Notifier) {
   }
 }
 
+// ---------- баллы ----------
+
+const SCORE_EVERY = 12 * 3600;
+const pts = (n: number) => String(Math.round(n * 10) / 10);
+const signed = (n: number) => (n > 0 ? "+" : "−") + pts(Math.abs(n));
+
+interface ScoreSnap {
+  attendance: number;
+  other: number;
+  semesterId: number | null;
+}
+
+/** Раз в 12 часов сверяем баллы: пишем, если изменились; при освобождении — напоминаем о новом семестре. */
+async function runScores(env: Env, budget: Budget, tg: Notifier, now: number) {
+  for (const user of await dueScoreUsers(env.DB, now)) {
+    if (!budget.has(3)) return;
+    const tgId = user.tg_id;
+    let cur: Awaited<ReturnType<typeof getScore>>;
+    try {
+      cur = await getScore(itmoFor(env, tgId, budget));
+    } catch (e) {
+      if (e instanceof TokenExpiredError) await alertTokenDead(env, tg, user);
+      else if (e instanceof BudgetExceeded) throw e;
+      else console.warn("score", tgId, (e as Error).message);
+      await saveScoreCheck(env.DB, tgId, null, now + 3600);
+      continue;
+    }
+    if (cur.attendance === null) {
+      await saveScoreCheck(env.DB, tgId, null, now + 3600); // ИТМО не ответил — попробуем через час
+      continue;
+    }
+    const snap: ScoreSnap = { attendance: cur.attendance, other: cur.other ?? 0, semesterId: cur.semesterId };
+    let prev: ScoreSnap | null = null;
+    try {
+      prev = user.score_last ? (JSON.parse(user.score_last) as ScoreSnap) : null;
+    } catch {
+      /* битое — считаем первым прогоном */
+    }
+    const settings = parseSettings(user.settings);
+    const store = () => saveScoreCheck(env.DB, tgId, JSON.stringify(snap), now + SCORE_EVERY);
+
+    // первый прогон — только запоминаем
+    if (!prev) {
+      await store();
+      continue;
+    }
+    const newSemester = prev.semesterId !== snap.semesterId;
+    const dA = snap.attendance - prev.attendance;
+    const dO = snap.other - prev.other;
+    const hasNews = newSemester ? settings.exempt : Math.abs(dA) >= 0.05 || Math.abs(dO) >= 0.05;
+    if (!hasNews) {
+      await store();
+      continue;
+    }
+    // тишина или пауза — не теряем новость, проверим снова через полчаса
+    if (user.paused_until > now || isQuiet(settings, now)) {
+      await saveScoreCheck(env.DB, tgId, null, now + 1800);
+      continue;
+    }
+
+    if (newSemester) {
+      await saveSettings(env.DB, tgId, { ...settings, theory: [] });
+      await tg.send(
+        tgId,
+        `🗓 Новый семестр по физре${cur.semester ? ` — <b>${esc(cur.semester)}</b>` : ""}. Теоретический зачёт оформляется заново:\n\n` +
+          `1. Справка у врача СК «Вяземский» — в течение 2 недель с даты освобождения\n` +
+          `2. Заявка в my.itmo: Спорт → Записаться → Спецпроекты → Теоретический зачёт (со справкой)\n` +
+          `3. Дальше преподаватель напишет на почту\n\nЧек-лист в «Моих» сбросил.`,
+        tg.appKb(),
+      );
+    } else {
+      const total = snap.attendance + snap.other;
+      const parts = [dA ? `${signed(dA)} за посещения` : "", dO ? `${signed(dO)} ${dA ? "доп." : "дополнительных"}` : ""].filter(Boolean);
+      const graded = settings.exempt && dO > 0 ? "\nПохоже, оценили работу по теоретическому зачёту 🎉" : "";
+      await tg.send(tgId, `📈 Баллы по физре: ${parts.join(", ")}\nТеперь <b>${pts(total)}</b> из 100${graded}`, tg.appKb());
+    }
+    await store();
+  }
+}
+
 // ---------- watchers ----------
 
 async function runWatchers(env: Env, budget: Budget, tg: Notifier, now: number) {
@@ -158,7 +243,7 @@ async function runWatchers(env: Env, budget: Budget, tg: Notifier, now: number) 
 
   for (const [tgId, watchers] of byUser) {
     const user = await getUser(env.DB, tgId);
-    if (!user) continue;
+    if (!user || parseSettings(user.settings).exempt) continue;
     const allBuildings = watchers.some((w) => !w.filter.buildings?.length);
     const buildings = allBuildings ? [] : [...new Set(watchers.flatMap((w) => w.filter.buildings ?? []))];
     const weeks = Math.max(...watchers.map((w) => w.filter.weeks ?? 2));

@@ -4,7 +4,7 @@ import { TOKEN_SCRIPT } from "../src/worker/bot/format";
 import { b64encode, decryptString, encryptString, hmacSha256, toHex } from "../src/worker/crypto";
 import { flattenChosen, normalizeDays, seatsFor, weekStarts } from "../src/worker/itmo/schedule";
 import { parseTokenInput, TokenInputError } from "../src/worker/itmo/tokens";
-import { isQuiet, matchesFilter, nextScheduleRun, parseRange, sanitizeWatcher, ValidationError } from "../src/worker/rules";
+import { isQuiet, matchesFilter, nextScheduleRun, parseRange, sanitizeSettings, sanitizeWatcher, ValidationError } from "../src/worker/rules";
 import { addDays, inWindow, isoWeekday, mskMonday, mskToUnix, mskToday } from "../src/worker/time";
 import { DEFAULT_SETTINGS, type Lesson } from "../src/shared/types";
 
@@ -201,5 +201,15 @@ describe("date range", () => {
     expect(weekStarts("2026-10-07", "2026-10-07")).toEqual(["2026-10-05"]);
     expect(weekStarts("2026-09-24", "2026-10-07")).toEqual(["2026-09-21", "2026-09-28", "2026-10-05"]);
     expect(weekStarts("2026-10-05", "2026-10-11")).toEqual(["2026-10-05"]);
+  });
+});
+
+describe("settings", () => {
+  it("exempt and theory steps are validated", () => {
+    const s = sanitizeSettings({ exempt: true, theory: ["letter", "doctor", "bogus", "doctor"] }, DEFAULT_SETTINGS);
+    expect(s.exempt).toBe(true);
+    expect(s.theory).toEqual(["doctor", "letter"]);
+    expect(sanitizeSettings({ exempt: "yes" }, s).exempt).toBe(true);
+    expect(sanitizeSettings({}, s).theory).toEqual(["doctor", "letter"]);
   });
 });

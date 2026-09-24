@@ -19,8 +19,12 @@ initAlerts();
 initProfile();
 
 let tab: Tab = "schedule";
+const exempt = () => !!state.me?.settings.exempt;
+/** При освобождении расписание и уведомления не нужны. */
+const visibleTabs = (): Tab[] => (exempt() ? ["my", "profile"] : TABS);
 
 function setTab(next: Tab, push = true) {
+  if (!visibleTabs().includes(next)) next = "my";
   tab = next;
   for (const t of TABS) $(`#view-${t}`).hidden = t !== next;
   $(`#view-${next}`).classList.remove("calm"); // показ вкладки — с анимацией, последующие обновления — без
@@ -60,6 +64,7 @@ function updateSub() {
   const sub = $("#topSub");
   if (!me) return;
   if (me.token.status !== "ok") sub.textContent = me.token.status === "expired" ? "Токен ИТМО истёк" : "Токен ИТМО не подключён";
+  else if (me.settings.exempt) sub.textContent = "Освобождение · теоретический зачёт";
   else if (state.schedule) sub.textContent = `Обновлено ${ago(state.schedule.fetchedAt)}`;
   else sub.textContent = "Загружаю расписание…";
 }
@@ -84,8 +89,9 @@ async function boot() {
   }
   emit("me");
   updateSub();
-  const initial = (location.hash.slice(1) as Tab) || "schedule";
+  const initial = (location.hash.slice(1) as Tab) || (exempt() ? "my" : "schedule");
   setTab(TABS.includes(initial) ? initial : "schedule", false);
+  if (exempt()) return; // расписание не грузим — зря дёргать ИТМО
   await loadSchedule();
   updateSub();
   // «мои записи» нужны, чтобы отмечать карточки, где ты уже записан
@@ -93,4 +99,17 @@ async function boot() {
 }
 
 on("schedule", updateSub);
+// включили/выключили освобождение в профиле — перестраиваем нижнее меню
+let wasExempt: boolean | null = null;
+on("me", () => {
+  const ex = exempt();
+  $$<HTMLButtonElement>("#dock button").forEach((b) => (b.hidden = !visibleTabs().includes(b.dataset.tab as Tab)));
+  moveInd($("#dock"));
+  if (wasExempt !== null && wasExempt !== ex) {
+    if (ex) setTab("my");
+    else loadSchedule();
+  }
+  wasExempt = ex;
+  updateSub();
+});
 boot().catch((e) => toast(String(e), true));

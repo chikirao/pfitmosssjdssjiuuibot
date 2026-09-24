@@ -93,13 +93,28 @@ export interface UserSettings {
   /** Тихие часы (МСК), уведомления interval-правил копятся до конца тишины. */
   quietFrom: string | null;
   quietTo: string | null;
+  /** Освобождение: вместо записи на занятия — теоретический зачёт. Прячет расписание и уведомления. */
+  exempt: boolean;
+  /** Отмеченные шаги теор. зачёта в текущем семестре (сбрасываются, когда ИТМО переключает семестр). */
+  theory: TheoryStep[];
 }
+
+/** Шаги теоретического зачёта — повторяются каждый семестр. */
+export const THEORY_STEPS = [
+  { id: "doctor", title: "Справка у врача", sub: "СК «Вяземский», в течение 2 недель с даты освобождения" },
+  { id: "applied", title: "Заявка на теор. зачёт", sub: "my.itmo → Спорт → Спецпроекты → Теоретический зачёт, со справкой" },
+  { id: "letter", title: "Письмо от преподавателя", sub: "тема и материалы — на почте" },
+  { id: "submitted", title: "Работа сдана", sub: "презентация — по переписке с преподавателем" },
+] as const;
+export type TheoryStep = (typeof THEORY_STEPS)[number]["id"];
 
 export const DEFAULT_SETTINGS: UserSettings = {
   autoUseLastAttempt: false,
   autoAllowIntersection: false,
   quietFrom: "23:00",
   quietTo: "08:00",
+  exempt: false,
+  theory: [],
 };
 
 export interface TokenStatus {
@@ -141,6 +156,7 @@ export interface Score {
   attendance: number | null; // за посещения; для зачёта нужно ≥ 60
   other: number | null; // дополнительные (соревнования, нормативы, проекты) — засчитываются, когда за посещения ≥ 60
   semester: string | null;
+  semesterId: number | null;
 }
 
 export interface MyResponse {
