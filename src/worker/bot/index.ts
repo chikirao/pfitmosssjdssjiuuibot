@@ -21,45 +21,19 @@ import {
 } from "../db";
 import { type Env, isAllowed } from "../env";
 import { ItmoError, TokenExpiredError } from "../itmo/client";
-import { getAttempts, getChosen } from "../itmo/schedule";
+import { getAttempts, getChosen, getScore } from "../itmo/schedule";
 import { itmoFor } from "../itmo/session";
 import { describeWatcher, isOpen, lessonStartUnix, nextRunAt } from "../rules";
 import { acceptTokenInput, createWatcher, editWatcher, findLessons, TokenInputError, tokenStatus, ValidationError } from "../services";
 import { signUp, unsign } from "../signup";
 import { nowSec } from "../time";
 import { buttonLabel, chosenLine, esc, humanDate, lessonLine, plural, TOKEN_SCRIPT } from "./format";
+import { catchesHtml, freeHtml, guideFallback, guideHtml, helpFallback, helpHtml, myHtml, replyRich, settingsHtml } from "./rich";
 
 let botInfo: UserFromGetMe | undefined;
 
 export function appUrl(env: Env, origin?: string) {
   return (env.APP_URL || origin || "").replace(/\/$/, "");
-}
-
-const HELP = `<b>Физра ИТМО</b> — свободные места и запись на секции.
-
-/free <i>[секция]</i> — что свободно в ближайшие 2 недели
-/my — мои записи (с отпиской)
-/watch <i>секция</i> — новое правило уведомлений
-/watches — мои правила
-/catches — отслеживаемые занятия (🎯 запишу сам / 🔔 сообщу о месте)
-/token — добавить или сменить токен ИТМО
-/pause <i>часы</i> · /resume — тишина
-/settings — лимиты автозаписи и тихие часы
-/forget — удалить все мои данные
-
-Всё то же самое — в мини-аппе (кнопка «Открыть» слева от поля ввода).`;
-
-function tokenHelp() {
-  return `<b>Как добавить токен ИТМО</b>
-
-1. Открой <a href="https://my.itmo.ru/sport/sign">my.itmo.ru</a> (залогинься), нажми F12 → Console.
-2. Вставь скрипт ниже (нажми на него — скопируется) и нажми Enter:
-
-<code>${esc(TOKEN_SCRIPT)}</code>
-
-3. Пришли мне то, что он скопировал. Сообщение с токеном я сразу удалю.
-
-Если Chrome не даёт вставить — один раз напечатай в консоли <code>allow pasting</code>.`;
 }
 
 /** Всё, что похоже на JWT ITMO ID. */
@@ -89,7 +63,7 @@ function watcherKeyboard(w: WatcherInput & { id: number }) {
   kb.text(mark(w.action === "notify", "🔔 Сообщать"), `we:${w.id}:a:n`).text(mark(w.action === "offer", "❓ Предлагать"), `we:${w.id}:a:o`);
   if (w.mode === "interval") kb.text(mark(w.action === "auto", "⚡ Авто"), `we:${w.id}:a:a`);
   kb.row();
-  kb.text(w.enabled ? "⏸ Выключить" : "▶️ Включить", `we:${w.id}:e`).text("🗑 Удалить", `wd:${w.id}`);
+  kb.text(w.enabled ? "⏸ Выключить" : "▶️ Включить", `we:${w.id}:e`).text("🗑 Удалить", `wd:${w.id}`).style("danger");
   return kb;
 }
 
@@ -118,25 +92,37 @@ export function createBot(env: Env, origin?: string) {
   const client = (ctx: Context) => itmoFor(env, ctx.from!.id);
   const openAppKb = (path = "") => (url ? new InlineKeyboard().webApp("Открыть мини-апп", `${url}/${path}`) : undefined);
 
-  bot.command(["start", "help"], async (ctx) => {
-    const row = await getUser(env.DB, ctx.from!.id);
-    const st = tokenStatus(row);
+  async function sendHelp(ctx: Context) {
+    const st = tokenStatus(await getUser(env.DB, ctx.from!.id));
     const tokenLine =
-      st.status === "ok" ? "🔑 Токен ИТМО подключён." : st.status === "expired" ? "🔑 Токен ИТМО истёк — пришли новый (/token)." : "🔑 Токен ИТМО ещё не добавлен — начни с /token.";
-    await ctx.reply(`${HELP}\n\n${tokenLine}`, { parse_mode: "HTML", reply_markup: openAppKb(), link_preview_options: { is_disabled: true } });
-  });
+      st.status === "ok" ? "🔑 Токен ИТМО подключён — всё работает." : st.status === "expired" ? "🔑 Токен ИТМО истёк — пришли новый, инструкция: /guide" : "🔑 Токен ИТМО ещё не добавлен — начни с /guide.";
+    const kb = new InlineKeyboard();
+    if (url) kb.webApp("Открыть мини-апп", url).style("primary").row();
+    if (st.status === "ok") kb.text("🟢 Что свободно", "free").text("📋 Мои записи", "my");
+    else kb.text("📖 Как подключить токен", "guide").style("success");
+    await replyRich(ctx, helpHtml(tokenLine), helpFallback(tokenLine), { reply_markup: kb });
+  }
+
+  async function sendGuide(ctx: Context) {
+    const st = tokenStatus(await getUser(env.DB, ctx.from!.id));
+    const status =
+      st.status === "ok"
+        ? `Сейчас токен ✅ подключён${st.refreshExp === null ? ", но без refresh — умрёт через ~30 мин. Пройди шаги заново" : ". Если прислать новый — заменю"}.`
+        : st.status === "expired"
+          ? "Сейчас токен ❌ истёк — пройди шаги заново."
+          : "Сейчас токена нет.";
+    const kb = new InlineKeyboard().url("Открыть my.itmo.ru", "https://my.itmo.ru/sport/sign");
+    if (url) kb.webApp("Мини-апп", url);
+    await replyRich(ctx, guideHtml(url, status, TOKEN_SCRIPT), guideFallback(status, TOKEN_SCRIPT), { reply_markup: kb });
+  }
+
+  bot.command(["start", "help"], sendHelp);
+  bot.command("guide", sendGuide);
 
   bot.command("token", async (ctx) => {
     const arg = ctx.match?.trim();
     if (arg && looksLikeToken(arg)) return handleToken(ctx, arg);
-    const st = tokenStatus(await getUser(env.DB, ctx.from!.id));
-    const status =
-      st.status === "ok"
-        ? `Сейчас: ✅ подключён${st.refreshExp === null ? " (без refresh — умрёт через ~30 мин)" : ""}.`
-        : st.status === "expired"
-          ? "Сейчас: ❌ истёк."
-          : "Сейчас: не добавлен.";
-    await ctx.reply(`${status}\n\n${tokenHelp()}`, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+    await sendGuide(ctx);
   });
 
   async function handleToken(ctx: Context, text: string) {
@@ -150,8 +136,7 @@ export function createBot(env: Env, origin?: string) {
     }
   }
 
-  bot.command("free", async (ctx) => {
-    const q = ctx.match?.trim();
+  async function sendFree(ctx: Context, q?: string) {
     await ctx.replyWithChatAction("typing");
     try {
       const lessons = (await findLessons(env, client(ctx), { query: q || undefined, weeks: 2 })).filter(isOpen);
@@ -160,31 +145,51 @@ export function createBot(env: Env, origin?: string) {
       const kb = new InlineKeyboard();
       for (const l of shown) {
         const id = await insertOffer(env.DB, ctx.from!.id, null, l, lessonStartUnix(l));
-        kb.text(buttonLabel(l, "✅ "), `o:${id}:y`).row();
+        kb.text(buttonLabel(l, "✅ "), `o:${id}:y`).style("success").row();
       }
+      if (url) kb.webApp("Все занятия в мини-аппе", url);
       const more = lessons.length > shown.length ? `\n\n…и ещё ${lessons.length - shown.length}. Полный список — в мини-аппе.` : "";
-      await ctx.reply(
+      await replyRich(
+        ctx,
+        freeHtml(shown, lessons.length, q),
         `<b>Свободно${q ? ` по «${esc(q)}»` : ""}: ${lessons.length} ${plural(lessons.length, "занятие", "занятия", "занятий")}</b>\n\n${shown.map((l, i) => lessonLine(l, i)).join("\n")}${more}\n\nНажми, чтобы записаться:`,
-        { parse_mode: "HTML", reply_markup: kb },
+        { reply_markup: kb },
       );
     } catch (e) {
       await ctx.reply(itmoErrorText(e), { parse_mode: "HTML" });
     }
-  });
+  }
 
-  bot.command("my", async (ctx) => {
+  async function sendMy(ctx: Context) {
     try {
       const c = client(ctx);
-      const [chosen, attempts] = await Promise.all([getChosen(c), getAttempts(c)]);
+      const [chosen, attempts, score] = await Promise.all([getChosen(c), getAttempts(c), getScore(c)]);
       const future = chosen.filter((l) => lessonStartUnix(l) > nowSec());
       const att = attempts.free !== null ? `\nОсталось записей в семестре: <b>${attempts.free}</b>${attempts.total !== null ? ` из ${attempts.total}` : ""} (и не больше 2 в неделю)` : "";
-      if (!future.length) return ctx.reply(`Предстоящих записей нет.${att}`, { parse_mode: "HTML" });
       const kb = new InlineKeyboard();
-      future.slice(0, 10).forEach((l) => kb.text(buttonLabel(l, "✖ "), `u:${l.id}`).row());
-      await ctx.reply(`<b>Мои записи</b>\n\n${future.map(chosenLine).join("\n")}${att}\n\nОтписаться:`, { parse_mode: "HTML", reply_markup: kb });
+      future.slice(0, 10).forEach((l) => kb.text(buttonLabel(l, "✖ "), `u:${l.id}`).style("danger").row());
+      if (url) kb.webApp("Открыть «Мои»", `${url}/#my`);
+      await replyRich(ctx, myHtml(future, attempts, score), future.length ? `<b>Мои записи</b>\n\n${future.map(chosenLine).join("\n")}${att}\n\nОтписаться:` : `Предстоящих записей нет.${att}`, {
+        reply_markup: kb,
+      });
     } catch (e) {
       await ctx.reply(itmoErrorText(e), { parse_mode: "HTML" });
     }
+  }
+
+  bot.command("free", (ctx) => sendFree(ctx, ctx.match?.trim()));
+  bot.command("my", sendMy);
+  bot.callbackQuery("free", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await sendFree(ctx);
+  });
+  bot.callbackQuery("my", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await sendMy(ctx);
+  });
+  bot.callbackQuery("guide", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await sendGuide(ctx);
   });
 
   bot.command("watch", async (ctx) => {
@@ -209,11 +214,13 @@ export function createBot(env: Env, origin?: string) {
     const cs = await listCatches(env.DB, ctx.from!.id, false);
     if (!cs.length) return ctx.reply("Ничего не отслеживаю. Открой занятие без мест в мини-аппе: «Поймать место» (запишу сам) или «Сообщить о месте».", { reply_markup: openAppKb() });
     const kb = new InlineKeyboard();
-    cs.forEach((c) => kb.text(`✖ ${buttonLabel(c)}`, `cx:${c.id}`).row());
-    await ctx.reply(`<b>Слежу за занятиями</b> (проверка раз в минуту):\n\n${cs.map((c) => `${c.mode === "notify" ? "🔔" : "🎯"} <b>${esc(c.section)}</b> — ${humanDate(c.date)}, ${esc(c.start)}`).join("\n")}\n\n🎯 — запишу сам, 🔔 — сообщу о месте. Отменить:`, {
-      parse_mode: "HTML",
-      reply_markup: kb,
-    });
+    cs.forEach((c) => kb.text(`✖ ${buttonLabel(c)}`, `cx:${c.id}`).style("danger").row());
+    await replyRich(
+      ctx,
+      catchesHtml(cs),
+      `<b>Слежу за занятиями</b> (проверка раз в минуту):\n\n${cs.map((c) => `${c.mode === "notify" ? "🔔" : "🎯"} <b>${esc(c.section)}</b> — ${humanDate(c.date)}, ${esc(c.start)}`).join("\n")}\n\n🎯 — запишу сам, 🔔 — сообщу о месте. Отменить:`,
+      { reply_markup: kb },
+    );
   });
 
   bot.command("pause", async (ctx) => {
@@ -228,16 +235,19 @@ export function createBot(env: Env, origin?: string) {
   });
 
   bot.command("settings", async (ctx) => {
-    const s = parseSettings((await getUser(env.DB, ctx.from!.id))?.settings);
-    await ctx.reply(
+    const row = await getUser(env.DB, ctx.from!.id);
+    const s = parseSettings(row?.settings);
+    await replyRich(
+      ctx,
+      settingsHtml(s, row?.paused_until ?? 0, nowSec()),
       `<b>Настройки</b>\nТратить последнюю запись семестра: <b>${s.autoUseLastAttempt ? "да" : "нет"}</b>\nАвтозапись при пересечении с парами: <b>${s.autoAllowIntersection ? "да" : "нет"}</b>\nТихие часы: <b>${s.quietFrom && s.quietTo ? `${s.quietFrom}–${s.quietTo}` : "выкл"}</b>\n\nМенять — в мини-аппе, вкладка «Профиль».`,
-      { parse_mode: "HTML", reply_markup: openAppKb("#profile") },
+      { reply_markup: openAppKb("#profile") },
     );
   });
 
   bot.command("forget", async (ctx) => {
     await ctx.reply("Удалить токен, правила, ловушки и историю? Это нельзя отменить.", {
-      reply_markup: new InlineKeyboard().text("Да, удалить всё", "forget:yes").text("Отмена", "forget:no"),
+      reply_markup: new InlineKeyboard().text("Да, удалить всё", "forget:yes").style("danger").text("Отмена", "forget:no"),
     });
   });
 
@@ -271,7 +281,7 @@ export function createBot(env: Env, origin?: string) {
   bot.callbackQuery(/^u:(\d+)$/, async (ctx) => {
     const id = ctx.match[1];
     await ctx.answerCallbackQuery();
-    await ctx.reply("Точно отписаться от этого занятия?", { reply_markup: new InlineKeyboard().text("Да, отписаться", `U:${id}`).text("Нет", "noop") });
+    await ctx.reply("Точно отписаться от этого занятия?", { reply_markup: new InlineKeyboard().text("Да, отписаться", `U:${id}`).style("danger").text("Нет", "noop") });
   });
 
   bot.callbackQuery(/^U:(\d+)$/, async (ctx) => {
@@ -322,7 +332,7 @@ export function createBot(env: Env, origin?: string) {
     const id = Number(ctx.match[1]);
     if (!ctx.match[2]) {
       await ctx.answerCallbackQuery();
-      return ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text("Да, удалить правило", `wd:${id}:y`).text("Отмена", `we:${id}:r`) });
+      return ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text("Да, удалить правило", `wd:${id}:y`).style("danger").text("Отмена", `we:${id}:r`) });
     }
     await deleteWatcher(env.DB, ctx.from.id, id);
     await ctx.answerCallbackQuery({ text: "Удалено" });
@@ -377,7 +387,7 @@ export function createBot(env: Env, origin?: string) {
   // Токен можно просто прислать сообщением — без команды.
   bot.on("message:text", async (ctx) => {
     if (looksLikeToken(ctx.message.text)) return handleToken(ctx, ctx.message.text);
-    await ctx.reply("Не понял. /help — список команд.");
+    await ctx.reply("Не понял. /help — список команд, /guide — как подключить токен.");
   });
 
   bot.catch((err) => console.error("grammy", err.error));

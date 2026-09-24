@@ -12,7 +12,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply fizra --remote",
     "deploy": "npm run build:web && wrangler deploy",
     "cf-typegen": "wrangler types src/worker/worker-configuration.d.ts",
-    "keys": "node scripts/gen-keys.mjs"
+    "keys": "node scripts/gen-keys.mjs",
+    "guide:shots": "node scripts/guide-shots.mjs"
   },
   "dependencies": {
     "grammy": "^1.46.0",

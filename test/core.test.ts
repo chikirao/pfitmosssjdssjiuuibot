@@ -213,3 +213,25 @@ describe("settings", () => {
     expect(sanitizeSettings({}, s).theory).toEqual(["doctor", "letter"]);
   });
 });
+
+describe("rich messages", async () => {
+  const rich = await import("../src/worker/bot/rich");
+  // теги из «Rich HTML style» Bot API 10.x — всё остальное Telegram отвергнет
+  const ALLOWED = new Set("a b strong i em u ins s strike del code mark sub sup tg-spoiler tg-emoji tg-time tg-math h1 h2 h3 h4 h5 h6 p pre footer hr ul ol li input blockquote aside cite img video audio tg-document figure figcaption tg-map tg-collage tg-slideshow table caption tr th td details summary tg-math-block tg-button tg-button-row br".split(" "));
+  const tags = (html: string) => [...html.matchAll(/<\/?([a-z][\w-]*)/g)].map((m) => m[1]!);
+  const lesson: Lesson = { id: 1, key: "k", groupId: 1, date: "2026-10-07", start: "19:10", end: "20:10", section: "Йога <b>", buildingId: 1, buildingName: "Ломоносова", sportTypeId: null, freeVisit: false, typeId: null, teacher: "Иванова", room: "", comment: "", available: 3, limit: 12, canSign: true, intersection: true };
+
+  it("uses only supported tags and escapes data", () => {
+    const pages = [
+      rich.helpHtml("🔑 ok"),
+      rich.guideHtml("https://x.dev", "status", "(()=>{a<b&&c})()"),
+      rich.freeHtml([lesson], 3, "йога"),
+      rich.myHtml([{ id: 1, section: "Йога", date: "2026-10-07", start: "19:10", end: "20:10", room: "", teacher: "", groupId: 1 }], { free: 3, total: 10 }, { attendance: 44, other: 12, semester: "Осень", semesterId: 1 }),
+      rich.catchesHtml([{ mode: "notify", section: "Йога", date: "2026-10-07", start: "19:10", end: null }]),
+      rich.settingsHtml(DEFAULT_SETTINGS, 0, 0),
+    ];
+    for (const p of pages) for (const t of tags(p)) expect(ALLOWED.has(t), t).toBe(true);
+    expect(pages[2]).toContain("Йога &lt;b&gt;");
+    expect(pages[1]).toContain("a&lt;b&amp;&amp;c");
+  });
+});

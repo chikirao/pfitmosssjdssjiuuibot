@@ -1,0 +1,236 @@
+<!doctype html>
+<!-- Иллюстрации к инструкции «как достать токен» (/guide). Рендер: npm run guide:shots → web/public/guide/step-N.png -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Guide shots</title>
+<style>
+  :root {
+    --bg: #eceaf0;
+    --accent: #8a4fc4;
+    --accent-soft: #efe4fa;
+    --ok: #6f9a1f;
+    --page: #ffffff;
+    --ink: #1d1b22;
+    --muted: #7c7885;
+    --line: #e6e3ea;
+    --dt-bg: #1f1f23;
+    --dt-bar: #28282d;
+    --dt-line: #3a3a41;
+    --dt-ink: #e3e3e8;
+    --dt-muted: #9a9aa5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    width: 1200px; height: 760px; overflow: hidden;
+    background: radial-gradient(120% 90% at 20% 0%, #f7f3fb 0%, var(--bg) 60%, #e3e0e8 100%);
+    font: 15px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--ink);
+    display: flex; flex-direction: column; padding: 34px 44px 40px;
+  }
+  .step { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .step.on { display: flex; }
+
+  /* заголовок шага */
+  .head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .num { width: 46px; height: 46px; border-radius: 23px; background: var(--accent); color: #fff; font-size: 24px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 6px 18px -6px rgba(138,79,196,.7); flex: none; }
+  .head h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  .head p { margin: 2px 0 0; color: var(--muted); font-size: 17px; }
+
+  /* окно браузера */
+  .win { flex: 1; min-height: 0; background: var(--page); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;
+         box-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 24px 60px -24px rgba(40,20,60,.35), 0 8px 20px -10px rgba(40,20,60,.2); }
+  .chrome { background: #f1eff4; border-bottom: 1px solid var(--line); padding: 10px 14px; display: flex; align-items: center; gap: 14px; }
+  .dots { display: flex; gap: 7px; }
+  .dots i { width: 12px; height: 12px; border-radius: 6px; background: #d9d5de; }
+  .navbtn { color: #a7a2ae; font-size: 18px; letter-spacing: 8px; }
+  .url { flex: 1; height: 34px; border-radius: 17px; background: #fff; border: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 15px; color: var(--muted); position: relative; }
+  .url b { color: var(--ink); font-weight: 500; }
+  .lock { width: 12px; height: 12px; border: 2px solid #9a95a3; border-radius: 3px; position: relative; top: 2px; }
+  .lock::before { content: ""; position: absolute; left: 1px; top: -8px; width: 6px; height: 7px; border: 2px solid #9a95a3; border-bottom: 0; border-radius: 5px 5px 0 0; }
+
+  .body { flex: 1; min-height: 0; display: flex; }
+  .site { flex: 1; min-width: 0; display: flex; }
+  .side { width: 190px; border-right: 1px solid var(--line); padding: 20px 14px; display: grid; align-content: start; gap: 6px; }
+  .side .logo { height: 26px; width: 110px; border-radius: 8px; background: linear-gradient(90deg, #d8c6ec, #efe7f7); margin: 0 6px 16px; }
+  .side span { height: 30px; border-radius: 8px; display: flex; align-items: center; padding: 0 10px; font-size: 14px; color: var(--muted); }
+  .side span.cur { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .main { flex: 1; min-width: 0; padding: 24px 28px; display: grid; align-content: start; gap: 14px; }
+  .main h2 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+  .filters { display: flex; gap: 8px; }
+  .filters i { height: 30px; border-radius: 15px; background: #f3f1f6; border: 1px solid var(--line); width: 120px; }
+  .filters i:first-child { width: 170px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .lesson { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 6px; }
+  .lesson b { font-size: 14px; }
+  .lesson small { color: var(--muted); font-size: 12.5px; }
+  .lesson .seat { justify-self: start; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #eef5df; color: var(--ok); font-weight: 600; }
+  .lesson .seat.no { background: #f5ecec; color: #b0504f; }
+
+  /* DevTools */
+  .dt { width: 560px; flex: none; background: var(--dt-bg); color: var(--dt-ink); display: flex; flex-direction: column; font: 13.5px/1.5 Consolas, "Cascadia Mono", monospace; border-left: 1px solid #000; }
+  .site.narrow .grid { grid-template-columns: 1fr; }
+  .site.narrow .side { display: none; }
+  .tabs { display: flex; background: var(--dt-bar); border-bottom: 1px solid var(--dt-line); font: 13px "Segoe UI", sans-serif; color: var(--dt-muted); }
+  .tabs span { padding: 9px 14px; position: relative; }
+  .tabs span.cur { color: #fff; }
+  .tabs span.cur::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; background: #8ab4f8; }
+  .con { flex: 1; padding: 8px 0; overflow: hidden; }
+  .ln { padding: 5px 14px 5px 30px; border-bottom: 1px solid #2c2c31; position: relative; white-space: pre-wrap; word-break: break-all; }
+  .ln::before { position: absolute; left: 12px; color: #8ab4f8; }
+  .ln.in::before { content: "›"; }
+  .ln.out::before { content: "‹"; color: var(--dt-muted); }
+  .ln.warn { background: #332b00; color: #f2d58a; border-color: #4a3f10; }
+  .ln.warn::before { content: "⚠"; color: #f2c14e; left: 10px; }
+  .ln.okline { color: #a9d46a; font-weight: 700; }
+  .ln.okline::before { content: "›"; color: transparent; }
+  .ln.prompt::before { content: "›"; }
+  .caret { display: inline-block; width: 8px; height: 17px; background: #8ab4f8; vertical-align: -3px; margin-left: 2px; }
+  .str { color: #f28b82; }
+  .fn { color: #c792ea; }
+  .dim { color: var(--dt-muted); }
+
+  /* подсветка и выноски */
+  .hl { position: relative; z-index: 2; }
+  .hl::after { content: ""; position: absolute; inset: -5px; border-radius: 12px; border: 3px solid var(--accent); box-shadow: 0 0 0 6px rgba(138,79,196,.18); pointer-events: none; }
+  .tabs span.hl::after { display: none; }
+  .tabs span.hl { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 9px; box-shadow: 0 0 0 5px rgba(138,79,196,.25); background: rgba(138,79,196,.18); }
+  .tip { position: absolute; z-index: 3; background: var(--accent); color: #fff; font: 600 15px/1.35 "Segoe UI", sans-serif; padding: 9px 14px; border-radius: 12px; box-shadow: 0 10px 24px -10px rgba(80,30,120,.6); white-space: nowrap; }
+  .tip::before { content: ""; position: absolute; width: 12px; height: 12px; background: var(--accent); transform: rotate(45deg); }
+  .tip.up::before { top: -5px; left: 26px; }
+  .tip.left::before { left: -5px; top: 50%; margin-top: -6px; }
+  .tip.down::before { bottom: -5px; left: 26px; }
+  .keys { display: inline-flex; gap: 6px; vertical-align: middle; margin: 0 4px; }
+  kbd { font: 700 14px "Segoe UI", sans-serif; background: #fff; color: var(--ink); border-radius: 7px; padding: 3px 9px; box-shadow: inset 0 -2px 0 #d6d1dc, 0 0 0 1px #d6d1dc; }
+  .tip kbd { box-shadow: inset 0 -2px 0 #cdb8e3; }
+
+  /* чат Telegram */
+  .tg { width: 470px; flex: none; background: #dfe7d6 linear-gradient(160deg, #e6eedc, #d3dfc6); border-left: 1px solid var(--line); display: flex; flex-direction: column; font-family: "Segoe UI", sans-serif; }
+  .tg-top { background: #fff; padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+  .ava { width: 38px; height: 38px; border-radius: 19px; background: radial-gradient(circle at 50% 38%, #2d2238, #0e0e10); position: relative; flex: none; }
+  .ava::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; border: 4px solid #c6a3e6; border-left-color: transparent; }
+  .tg-top b { display: block; font-size: 15px; }
+  .tg-top small { color: var(--muted); }
+  .chat { flex: 1; padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; justify-content: flex-end; }
+  .msg { max-width: 88%; padding: 8px 12px 6px; border-radius: 14px; font-size: 14.5px; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
+  .msg.me { align-self: flex-end; background: #effdde; border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: #fff; border-bottom-left-radius: 4px; }
+  .msg code { font: 13px Consolas, monospace; word-break: break-all; color: #3d6b1c; }
+  .msg .t { display: block; text-align: right; font-size: 11.5px; color: #8fa184; margin-top: 2px; }
+  .msg.gone { opacity: .55; text-decoration: line-through; text-decoration-color: rgba(0,0,0,.35); }
+  .input { background: #fff; margin: 0 12px 12px; border-radius: 22px; padding: 11px 16px; color: var(--muted); font-size: 14.5px; }
+</style>
+</head>
+<body>
+
+<!-- 1. открыть my.itmo.ru -->
+<section class="step" data-step="1">
+  <div class="head"><div class="num">1</div><div><h1>Открой my.itmo.ru на компьютере</h1><p>Страница записи на физкультуру. Войди в аккаунт ИТМО, если попросит</p></div></div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="navbtn">‹ › ⟳</span>
+      <div class="url hl"><span class="lock"></span><b>my.itmo.ru</b>/sport/sign</div></div>
+    <div class="body"><div class="site">
+      <div class="side"><div class="logo"></div><span>Главная</span><span>Расписание</span><span class="cur">Физкультура</span><span>Документы</span><span>Сервисы</span></div>
+      <div class="main">
+        <h2>Запись на занятия</h2>
+        <div class="filters"><i></i><i></i><i></i></div>
+        <div class="grid">
+          <div class="lesson"><b>Йога</b><small>вт, 19:10–20:10 · Ломоносова</small><span class="seat">5 мест</span></div>
+          <div class="lesson"><b>Волейбол</b><small>ср, 17:00–18:30 · Кронверкский</small><span class="seat no">нет мест</span></div>
+          <div class="lesson"><b>Плавание</b><small>чт, 08:20–09:50 · Вяземский</small><span class="seat">2 места</span></div>
+          <div class="lesson"><b>ОФП</b><small>пт, 13:30–15:00 · Кронверкский</small><span class="seat">11 мест</span></div>
+          <div class="lesson"><b>Настольный теннис</b><small>пт, 15:20–16:50 · Ломоносова</small><span class="seat no">нет мест</span></div>
+          <div class="lesson"><b>Фитнес</b><small>сб, 11:00–12:30 · Вяземский</small><span class="seat">7 мест</span></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <div class="tip up" style="left:560px;top:172px">Адрес: my.itmo.ru/sport/sign</div>
+</section>
+
+<!-- 2. F12 → Console -->
+<section class="step" data-step="2">
+  <div class="head"><div class="num">2</div><div><h1>Открой консоль разработчика</h1><p>Нажми <span class="keys"><kbd>F12</kbd></span> (или <span class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>J</kbd></span>, на Mac <span class="keys"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd></span>) и выбери вкладку Console</p></div></div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="navbtn">‹ › ⟳</span>
+      <div class="url"><span class="lock"></span><b>my.itmo.ru</b>/sport/sign</div></div>
+    <div class="body">
+      <div class="site narrow"><div class="main">
+        <h2>Запись на занятия</h2>
+        <div class="filters"><i></i><i></i></div>
+        <div class="grid">
+          <div class="lesson"><b>Йога</b><small>вт, 19:10–20:10 · Ломоносова</small><span class="seat">5 мест</span></div>
+          <div class="lesson"><b>Волейбол</b><small>ср, 17:00–18:30 · Кронверкский</small><span class="seat no">нет мест</span></div>
+          <div class="lesson"><b>Плавание</b><small>чт, 08:20–09:50 · Вяземский</small><span class="seat">2 места</span></div>
+        </div>
+      </div></div>
+      <div class="dt">
+        <div class="tabs"><span>Elements</span><span class="cur hl">Console</span><span>Sources</span><span>Network</span><span>Application</span></div>
+        <div class="con"><div class="ln prompt"><span class="caret"></span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="tip up" style="left:680px;top:230px">Вкладка Console</div>
+</section>
+
+<!-- 3. вставить скрипт -->
+<section class="step" data-step="3">
+  <div class="head"><div class="num">3</div><div><h1>Вставь скрипт из бота и нажми Enter</h1><p>Скрипт — в сообщении бота (нажми на него, и он скопируется)</p></div></div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="navbtn">‹ › ⟳</span>
+      <div class="url"><span class="lock"></span><b>my.itmo.ru</b>/sport/sign</div></div>
+    <div class="body">
+      <div class="site narrow"><div class="main">
+        <h2>Запись на занятия</h2>
+        <div class="filters"><i></i><i></i></div>
+        <div class="grid">
+          <div class="lesson"><b>Йога</b><small>вт, 19:10–20:10 · Ломоносова</small><span class="seat">5 мест</span></div>
+          <div class="lesson"><b>Волейбол</b><small>ср, 17:00–18:30 · Кронверкский</small><span class="seat no">нет мест</span></div>
+        </div>
+      </div></div>
+      <div class="dt">
+        <div class="tabs"><span>Elements</span><span class="cur">Console</span><span>Sources</span><span>Network</span><span>Application</span></div>
+        <div class="con">
+          <div class="ln warn">Warning: Don’t paste code into the DevTools Console that you don’t understand… Please type ‘allow pasting’ below and press Enter to allow pasting.</div>
+          <div class="ln in hl" style="margin:10px 12px 12px">allow pasting</div>
+          <div class="ln in hl" style="margin:0 12px"><span class="dim">(()=&gt;{</span><span class="fn">const</span> c=n=&gt;decodeURIComponent(document.cookie.match(<span class="str">'(^|; )'</span>+n…<span class="dim"> … </span>copy(s)…})()<span class="caret"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip up" style="left:640px;top:418px">① Если Chrome не даёт вставить — напечатай <u>allow pasting</u> и Enter<br>② Вставь скрипт (<span class="keys"><kbd>Ctrl</kbd><kbd>V</kbd></span>) и нажми Enter</div>
+</section>
+
+<!-- 4. прислать боту -->
+<section class="step" data-step="4">
+  <div class="head"><div class="num">4</div><div><h1>Токен скопирован — пришли его боту</h1><p>Вставь в чат (<span class="keys"><kbd>Ctrl</kbd><kbd>V</kbd></span>) и отправь. Сообщение с токеном бот сразу удалит</p></div></div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="navbtn">‹ › ⟳</span>
+      <div class="url"><span class="lock"></span><b>my.itmo.ru</b>/sport/sign</div></div>
+    <div class="body">
+      <div class="dt" style="flex:1;width:auto;border-left:0">
+        <div class="tabs"><span>Elements</span><span class="cur">Console</span><span>Sources</span><span>Network</span></div>
+        <div class="con">
+          <div class="ln in"><span class="dim">(()=&gt;{</span><span class="fn">const</span> c=n=&gt;decodeURIComponent(…copy(s)…})()</div>
+          <div class="ln okline hl" style="margin:10px 12px">✓ Скопировано (access + refresh) — вставь в бота</div>
+        </div>
+      </div>
+      <div class="tg">
+        <div class="tg-top"><div class="ava"></div><div><b>Физра ИТМО</b><small>бот</small></div></div>
+        <div class="chat">
+          <div class="msg me gone"><code>{"access":"eyJhbGciOiJSUzI1NiIsInR5cCI6…","refresh":"eyJhbGciOiJIUzUxMiIs…"}</code><span class="t">21:40 ✓✓</span></div>
+          <div class="msg bot hl">✅ Токен сохранён. Бот сам будет его продлевать, пока жива сессия ИТМО.<br><i style="color:#8a8591">Сообщение с токеном удалено.</i><span class="t">21:40</span></div>
+        </div>
+        <div class="input">Сообщение</div>
+      </div>
+    </div>
+  </div>
+  <div class="tip up" style="left:60px;top:318px">Появится эта строка — значит, всё скопировалось</div>
+</section>
+
+<script>
+  const n = new URLSearchParams(location.search).get("step") || "1";
+  document.querySelector(`[data-step="${n}"]`).classList.add("on");
+</script>
+</body>
+</html>

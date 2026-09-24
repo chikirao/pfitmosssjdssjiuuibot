@@ -118,7 +118,7 @@ async function runCatches(env: Env, budget: Budget, tg: Notifier) {
             await tg.send(
               tgId,
               `🔔 Появилось место: <b>${esc(c.section)}</b> — ${humanDate(c.date)}, ${esc(c.start)}${c.end ? "–" + esc(c.end) : ""}\nСвободно ${seats.available} из ${seats.limit}`,
-              new InlineKeyboard().text("✅ Записать", `cs:${c.id}`).text("Хватит следить", `cx:${c.id}`),
+              new InlineKeyboard().text("✅ Записать", `cs:${c.id}`).style("success").text("Хватит следить", `cx:${c.id}`),
             );
           } else if (!open && c.lastOpen) await setCatchOpen(env.DB, c.id, false);
           else await touchCatch(env.DB, c.id);
@@ -275,7 +275,7 @@ async function runWatchers(env: Env, budget: Budget, tg: Notifier, now: number) 
 
 async function offerKb(env: Env, w: WatcherWithOwner, l: Lesson, withMute: boolean) {
   const id = await insertOffer(env.DB, w.tgId, w.id, l, lessonStartUnix(l));
-  const kb = new InlineKeyboard().text("✅ Записать", `o:${id}:y`).text("✖ Нет", `o:${id}:n`);
+  const kb = new InlineKeyboard().text("✅ Записать", `o:${id}:y`).style("success").text("✖ Нет", `o:${id}:n`);
   if (withMute) kb.row().text("🔕 Выключить это правило", `wm:${w.id}`);
   return kb;
 }

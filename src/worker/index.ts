@@ -37,6 +37,7 @@ app.get("/tg/setup", async (c) => {
     { command: "watch", description: "Новое правило уведомлений" },
     { command: "watches", description: "Мои правила" },
     { command: "catches", description: "Ловушки мест" },
+    { command: "guide", description: "Как подключить токен (с картинками)" },
     { command: "token", description: "Токен ИТМО" },
     { command: "pause", description: "Тишина на N часов" },
     { command: "resume", description: "Вернуть уведомления" },

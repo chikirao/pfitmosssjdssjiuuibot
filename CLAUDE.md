@@ -40,7 +40,7 @@ src/worker/
   signup.ts          запись/отписка + защиты автозаписи
   services.ts        общая логика бота и API
   scheduler.ts       cron: keepalive токенов → ловушки → правила
-  bot/               grammY: команды, inline-кнопки, форматирование сообщений
+  bot/               grammY: команды, inline-кнопки, форматирование; rich.ts — rich-сообщения (таблицы, гайд с картинками)
 web/                 мини-апп: Vite + TypeScript без фреймворка
   src/main.ts        табы (hash-роутинг #schedule/#my/#alerts/#profile), загрузка
   src/views/*.ts     экраны; src/ui.ts хелперы/шит/попап/fluidHover/тосты; src/tg.ts обёртка Telegram.WebApp
@@ -104,6 +104,9 @@ oldbot/              старый Python-бот на йогу (только ре
 
 - TypeScript strict, ES-модули, без лишних зависимостей: воркер — hono + grammy, фронт — ничего, кроме Vite.
 - Все пользовательские тексты на русском. В боте parse_mode HTML, всё динамическое экранируется через `esc()`.
+  Ответы на команды — rich-сообщения (Bot API 10.1+, `bot/rich.ts`: заголовки, таблицы, картинки, `<details>`) через `replyRich` с обычным HTML-фолбэком;
+  разрешены только теги из «Rich HTML style» (проверяет тест). Кнопки с последствиями — `.style("danger")`, основное действие — `"success"`/`"primary"`.
+  Картинки /guide — `web/public/guide/step-N.png`, рисуются из `assets/guide/guide.html`: `npm run guide:shots`. Новая команда → добавить в `setMyCommands` (`index.ts`) и перезапустить `/tg/setup`.
 - Фронт: DOM-строки через шаблоны + `esc()`; никаких inline-обработчиков (их режет CSP); клики — делегированием.
 - Дизайн: мягкие карточки (градиентная обводка, `--shadow-card`), кнопки `.btn-*` с эффектом нажатия из Fluid Functionalism
   (внутренний слой `inset:1px` + схлопывающийся spread 180 мс `cubic-bezier(.23,1,.32,1)`), `.soft` — «Reject»-кнопка из макета.
